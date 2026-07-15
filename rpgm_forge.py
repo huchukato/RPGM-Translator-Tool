@@ -13,8 +13,8 @@ from typing import Optional
 
 from rpgm_detector import detect_engine
 
-FORGE_CACHE_DIR = Path.home() / ".cache" / "rpgm-translator"
-FORGE_CACHE_FILE = FORGE_CACHE_DIR / "forge.js"
+SCRIPT_DIR = Path(__file__).resolve().parent
+FORGE_BUNDLED_JS = SCRIPT_DIR / "forge.js"
 FORGE_BACKUP_SUFFIX = ".forge_bak"
 
 FORGE_ENTRY = {
@@ -25,25 +25,17 @@ FORGE_ENTRY = {
 }
 
 
-def _cache_forge_js(source_path: Path) -> None:
-    FORGE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source_path, FORGE_CACHE_FILE)
-
-
-def ensure_forge_js(user_path: Optional[Path] = None) -> Optional[Path]:
-    """Restituisce il percorso di forge.js dalla cache o da quello fornito dall'utente."""
-    if user_path and user_path.exists():
-        _cache_forge_js(user_path)
-        return FORGE_CACHE_FILE
-    if FORGE_CACHE_FILE.exists():
-        return FORGE_CACHE_FILE
-    return None
+def ensure_forge_js() -> Path:
+    """Restituisce il percorso del forge.js incluso nella repo."""
+    if not FORGE_BUNDLED_JS.exists():
+        raise FileNotFoundError(f"forge.js non trovato in {FORGE_BUNDLED_JS}")
+    return FORGE_BUNDLED_JS
 
 
 def patch_keybind(forge_js_content: str, key: str = "1") -> str:
     """Modifica la keybind Toggle Cheat UI da Ctrl+C al tasto indicato."""
-    # Sostituisce keyStr:"Ctrl C" / keyStr:'Ctrl C' / keyStr: "Ctrl C" etc.
-    pattern = re.compile(r'(keyStr\s*[:=]\s*["\'])Ctrl\s*C(["\'])')
+    # Sostituisce keyStr:"Ctrl C", keyStr:'Ctrl C', keyStr:`Ctrl C`, etc.
+    pattern = re.compile(r'(keyStr\s*[:=]\s*["\'`])Ctrl\s*C(["\'`])')
     return pattern.sub(lambda m: f'{m.group(1)}{key}{m.group(2)}', forge_js_content)
 
 

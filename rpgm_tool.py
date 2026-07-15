@@ -19,7 +19,7 @@ from tkinter import filedialog, messagebox
 
 from rpgm_detector import detect_engine, DetectionError
 from rpgm_extractor import RPGMExtractor
-from rpgm_forge import ensure_forge_js, install_forge, FORGE_CACHE_FILE
+from rpgm_forge import ensure_forge_js, install_forge
 from rpgm_parser import ExtractedString
 from rpgm_settings import (
     BACKEND_LABELS, BACKENDS, DEFAULT_SETTINGS, LANGUAGES, SETTINGS_FILE,
@@ -529,19 +529,11 @@ class RPGMTranslatorApp(ctk.CTk):
         if not self.game_path:
             messagebox.showerror(self._t("error"), self._t("select_game_first"))
             return
-        forge_path = ensure_forge_js()
-        if not forge_path:
-            selected = filedialog.askopenfilename(
-                parent=self,
-                title=self._t("forge_select_file"),
-                filetypes=[("JavaScript files", "*.js"), ("All files", "*.*")],
-            )
-            if not selected:
-                return
-            forge_path = ensure_forge_js(Path(selected))
-            if not forge_path:
-                messagebox.showerror(self._t("error"), self._t("forge_select_file"))
-                return
+        try:
+            forge_path = ensure_forge_js()
+        except FileNotFoundError as e:
+            messagebox.showerror(self._t("error"), str(e))
+            return
         self._reset_ui_for_work()
         threading.Thread(target=self._install_forge_thread, args=(forge_path,), daemon=True).start()
 

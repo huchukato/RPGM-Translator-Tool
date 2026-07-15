@@ -56,6 +56,11 @@ python3 rpgm_tool.py
 
 Prima della patch, lo strumento salva un backup di `www/data` in `www/data_bak_<timestamp>`.
 
+## 🙏 Crediti
+
+- Cheat mod basata su **[Forge for RPGM MV/MZ](https://gitgud.io/serjura/forge-mvmz)** di serjura / zero64801.
+- Il tasto per aprire la cheat UI è modificato in `1` per un accesso rapido.
+
 ## ⚠️ Licenza
 
 Fornito "così com'è" senza garanzia. Usalo a tuo rischio.
