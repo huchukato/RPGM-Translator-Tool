@@ -11,7 +11,7 @@
 
 Uno strumento GUI per tradurre automaticamente giochi **RPG Maker MV/MZ**.
 
-Combina l'interfaccia scura a tab di **WTForge** con il motore di traduzione di **Ren'Py Translator**.
+Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di **WTForge**.
 
 ## ✨ Funzionalità
 
