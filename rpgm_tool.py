@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -519,6 +520,7 @@ class RPGMTranslatorApp(ctk.CTk):
             self.btn_forge.configure(state="normal")
         if self.items and self.game_path:
             self.btn_save.configure(state="normal")
+            self.btn_export.configure(state="normal")
         self._apply_filter()
 
     def _cancel(self):
@@ -622,6 +624,11 @@ class RPGMTranslatorApp(ctk.CTk):
         result = self.translator.translate_many(texts, progress_cb=_progress)
         for item in targets:
             item.translated = result.get(item.text, "")
+            # The translator preserves escape codes (\OutlineColor[28], \}) and
+            # inline tags (<Choice Width: 320>) in place via token protection, so
+            # the writer must not re-insert them from escape_parts, which would
+            # duplicate and mis-position the codes.
+            item.escape_parts = []
         done = sum(1 for i in self.items if i.translated)
         msg = self._t("translation_complete", done, len(self.items))
         self.log(msg)
@@ -689,15 +696,30 @@ class RPGMTranslatorApp(ctk.CTk):
         threading.Thread(target=self._export_thread, args=(Path(dest), lang_code), daemon=True).start()
 
     def _export_thread(self, dest: Path, lang_code: str):
+        tmp_parent: Path | None = None
         try:
-            self.root_after(lambda: self._set_progress(0.5, self._t("progress_exporting")))
-            export_dir = export_patch(self.extractor.root, dest, lang_code)
+            self.root_after(lambda: self._set_progress(0.3, self._t("progress_exporting")))
+            src_root = self.extractor.root
+            # Apply the current translations to a temporary copy of the game data
+            # so the exported patch is translated without forcing a Save first,
+            # and without touching the original game files.
+            tmp_parent = Path(tempfile.mkdtemp(prefix="rpgm_export_"))
+            tmp_root = tmp_parent / src_root.name
+            src_data = src_root / "www" / "data" if (src_root / "www" / "data").is_dir() else src_root / "data"
+            dst_data = tmp_root / src_data.relative_to(src_root)
+            dst_data.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(src_data, dst_data)
+            patch_data_files(tmp_root, self.items)
+            export_dir = export_patch(tmp_root, dest, lang_code)
             msg = self._t("exported", export_dir)
             self.log(msg)
             self.root_after(lambda: self._set_progress(1.0, msg))
             self.root_after(self._on_work_done)
         except Exception as e:
             self._handle_error(e)
+        finally:
+            if tmp_parent is not None:
+                shutil.rmtree(tmp_parent, ignore_errors=True)
 
     # ─── Settings & Options ──────────────────────────────────────────────
 

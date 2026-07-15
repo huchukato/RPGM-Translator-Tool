@@ -74,8 +74,9 @@ UNSAFE_PARAM_KEYS = {
     "asset", "assetname", "filetext", "filepath", "filefolder",
 }
 
-# Regex escape code RPG Maker: \X[123] oppure \{ \} \. \| \^ \$ \> \< \\ \!
-ESC_RE = re.compile(r"\\([A-Z])(\[\d+\])?|\\([{}!.|^$><\\])")
+# Regex escape code RPG Maker: \Word[123] (es. \OutlineColor[28], \FS[30], \C[3])
+# oppure caratteri speciali \{ \} \. \| \^ \$ \> \< \\ \!
+ESC_RE = re.compile(r"\\([A-Za-z]+)(\[\d+\])?|\\([{}!.|^$><\\])")
 
 
 def extract_escape_codes(text: str) -> tuple[str, list[dict]]:
