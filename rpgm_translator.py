@@ -76,7 +76,9 @@ class TranslationError(RuntimeError):
 
 class Translator:
     RE_TOKEN = re.compile(
-        r"(\\\\n|\\\\\"|<[^>]*>|\{[^}]*\}|\[[^\]]*\]|%\([^)]+\)[#0\- +]?\d*(?:\.\d+)?[a-zA-Z]|%[sdrof]|%%|https?://[^\s]+)"
+        r"(\\\\n|\\\\\"|<[^>]*>|\{[^}]*\}|\[[^\]]*\]|"
+        r"\\[A-Za-z]+(?:\[\d+\])?|\\[{}!.|^$><\\]|"
+        r"%\([^)]+\)[#0\- +]?\d*(?:\.\d+)?[a-zA-Z]|%[sdrof]|%%|https?://[^\s]+)"
     )
 
     def __init__(self, cfg: TranslatorConfig):
