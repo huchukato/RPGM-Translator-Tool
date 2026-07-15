@@ -76,7 +76,7 @@ class TranslationError(RuntimeError):
 
 class Translator:
     RE_TOKEN = re.compile(
-        r"(\\\\n|\\\\\"|\{[^}]*\}|\[[^\]]*\]|%\([^)]+\)[#0\- +]?\d*(?:\.\d+)?[a-zA-Z]|%[sdrof]|%%|https?://[^\s]+)"
+        r"(\\\\n|\\\\\"|<[^>]*>|\{[^}]*\}|\[[^\]]*\]|%\([^)]+\)[#0\- +]?\d*(?:\.\d+)?[a-zA-Z]|%[sdrof]|%%|https?://[^\s]+)"
     )
 
     def __init__(self, cfg: TranslatorConfig):
@@ -162,7 +162,7 @@ class Translator:
         protected, maps = zip(*[self._protect(t) for t in texts]) if texts else ([], [])
         protected = list(protected); maps = list(maps)
         raw = self._raw_batch(protected, log_cb, progress_cb, done_offset, total)
-        return [self._restore(r, m).replace("%", "%%") for r, m in zip(raw, maps)]
+        return [self._restore(r, m) for r, m in zip(raw, maps)]
 
     def _raw_batch(self, texts: list[str], log_cb=None, progress_cb=None, done_offset=0, total=0) -> list[str]:
         b = self.cfg.backend

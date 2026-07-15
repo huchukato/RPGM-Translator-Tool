@@ -304,7 +304,7 @@ def parse_plugins_js(plugins_js_path: Path, idx_ref: list[int]) -> list[Extracte
 
     def is_safe_key(last_key: str) -> bool:
         low = last_key.lower()
-        if low in UNSAFE_PARAM_KEYS:
+        if any(u in low for u in UNSAFE_PARAM_KEYS):
             return False
         return any(s in low for s in SAFE_PARAM_KEYS)
 
