@@ -34,6 +34,7 @@ cp -r \
     rpgm_forge.py \
     forge.js \
     logo_*.png \
+    translator-gui.png \
     splash.jpg \
     "$OUT_DIR/"
 
