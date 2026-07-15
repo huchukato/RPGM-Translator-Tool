@@ -615,7 +615,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.root_after(lambda: self._set_progress(base_progress, self._t("progress_translating")))
         cfg = self._make_config()
         self.translator = Translator(cfg)
-        texts = [i.text for i in targets]
+        texts = [i.clean_text for i in targets]
 
         def _progress(done, total):
             frac = base_progress + (done / max(total, 1)) * range_progress
@@ -623,12 +623,7 @@ class RPGMTranslatorApp(ctk.CTk):
 
         result = self.translator.translate_many(texts, progress_cb=_progress)
         for item in targets:
-            item.translated = result.get(item.text, "")
-            # The translator preserves escape codes (\OutlineColor[28], \}) and
-            # inline tags (<Choice Width: 320>) in place via token protection, so
-            # the writer must not re-insert them from escape_parts, which would
-            # duplicate and mis-position the codes.
-            item.escape_parts = []
+            item.translated = result.get(item.clean_text, "")
         done = sum(1 for i in self.items if i.translated)
         msg = self._t("translation_complete", done, len(self.items))
         self.log(msg)
@@ -698,7 +693,7 @@ class RPGMTranslatorApp(ctk.CTk):
     def _export_thread(self, dest: Path, lang_code: str):
         tmp_parent: Path | None = None
         try:
-            self.root_after(lambda: self._set_progress(0.3, self._t("progress_exporting")))
+            self.root_after(lambda: self._set_progress(0.3, self._t("progress_patching")))
             src_root = self.extractor.root
             # Apply the current translations to a temporary copy of the game data
             # so the exported patch is translated without forcing a Save first,
@@ -710,6 +705,7 @@ class RPGMTranslatorApp(ctk.CTk):
             dst_data.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src_data, dst_data)
             patch_data_files(tmp_root, self.items)
+            self.root_after(lambda: self._set_progress(0.7, self._t("progress_exporting")))
             export_dir = export_patch(tmp_root, dest, lang_code)
             msg = self._t("exported", export_dir)
             self.log(msg)

@@ -21,6 +21,7 @@ class ExtractedString:
     key_path: list[str | int]
     translated: str = ""
     escape_parts: list[dict] = field(default_factory=list)
+    clean_text: str = ""
 
 
 # Campi testo riconosciuti nei JSON data
@@ -48,7 +49,7 @@ SKIP_KEYS = {
 ASSET_CONTEXT_KEYS = {
     "bgm", "bgs", "se", "me", "picture", "image", "animation", "tileset",
     "parallax", "battleback1", "battleback2", "title1", "title2", "file",
-    "sound", "movie", "voice", "audio", "video", "titleBgm", "titleBgs",
+    "sound", "sounds", "movie", "voice", "audio", "video", "titleBgm", "titleBgs",
     "victoryMe", "defeatMe", "gameoverMe", "boatBgm", "shipBgm",
     "airshipBgm", "airshipBgs", "attackSound", "recoverySound", "missSound",
     "evasionSound", "magicEvasionSound", "magicReflectionSound", "shopSound",
@@ -76,7 +77,7 @@ UNSAFE_PARAM_KEYS = {
 
 # Regex escape code RPG Maker: \Word[123] (es. \OutlineColor[28], \FS[30], \C[3])
 # oppure caratteri speciali \{ \} \. \| \^ \$ \> \< \\ \!
-ESC_RE = re.compile(r"\\([A-Za-z]+)(\[\d+\])?|\\([{}!.|^$><\\])")
+ESC_RE = re.compile(r"\\([A-Za-z]+)(?:\[\d+\])?|\\([{}!.|^$><\\])")
 
 
 def extract_escape_codes(text: str) -> tuple[str, list[dict]]:
@@ -199,6 +200,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             file=file_name,
             key_path=list(keys),
             escape_parts=parts,
+            clean_text=clean,
         ))
 
     def check_string(val: str, keys: list[str | int]) -> None:
@@ -337,6 +339,7 @@ def parse_plugins_js(plugins_js_path: Path, idx_ref: list[int]) -> list[Extracte
                 file="../js/plugins.js",
                 key_path=list(keys),
                 escape_parts=parts,
+                clean_text=clean,
             ))
 
     def extract_param_object(obj: Any, keys: list[str | int]) -> None:
