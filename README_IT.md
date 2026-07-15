@@ -1,0 +1,61 @@
+# 🎮 RPGM-Translator
+
+![RPGM-Translator Logo](logo_512.png)
+
+![Python](https://img.shields.io/badge/python-3.9+-06b6d4.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-10b981.svg)
+![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-7c3aed.svg)
+![License](https://img.shields.io/badge/license-As--Is-f59e0b.svg)
+
+Uno strumento GUI per tradurre automaticamente giochi **RPG Maker MV/MZ**.
+
+Combina l'interfaccia scura a tab di **WTForge** con il motore di traduzione di **Ren'Py Translator**.
+
+## ✨ Funzionalità
+
+- 🕹️ Rileva automaticamente giochi **RPG Maker MV/MZ**.
+- 📝 Estrae stringhe traducibili da:
+  - 🗺️ `Map*.json` (dialoghi, scelte, testo scorrevole)
+  - 🔁 `CommonEvents.json`
+  - ⚙️ `System.json` (titolo del gioco, termini, etichette)
+  - 🛡️ `Items.json`, `Weapons.json`, `Armors.json`, `Skills.json`, `States.json`, `Enemies.json`, `Actors.json`, `Classes.json`
+  - 🔌 `js/plugins.js` (parametri testuali dei plugin)
+- 🌍 Backend di traduzione: **Google Turbo**, **Bing Ultra**, **OpenRouter**, **Llama locale**.
+- 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte).
+- 💾 Patch in-place con backup automatico dei dati.
+- 🗂️ Cache globale e locale delle traduzioni.
+- 📦 Esportazione delle traduzioni come patch.
+
+## 📋 Requisiti
+
+- Python 3.9+
+- `customtkinter`, `pillow`, `deep-translator`, `requests`
+
+## 🚀 Avvio rapido
+
+```bash
+# macOS / Linux
+./start.sh
+
+# Windows
+start.bat
+
+# Oppure direttamente
+python3 rpgm_tool.py
+```
+
+## 🔄 Flusso di lavoro
+
+1. 🎮 **Seleziona Gioco** — Clicca `.app` (macOS) o `Cartella` e scegli la cartella del gioco.
+2. 🧠 **Analizza & Traduci** — Estrai e traduci automaticamente tutte le stringhe.
+3. ✏️ **Modifica** — Revisiona o modifica ogni stringa direttamente nella tabella.
+4. 💾 **Salva** — Applica le traduzioni ai file del gioco (il backup viene creato automaticamente).
+5. 📦 **Esporta** — Opzionalmente esporta la `www/data` tradotta come patch.
+
+## 🛡️ Backup
+
+Prima della patch, lo strumento salva un backup di `www/data` in `www/data_bak_<timestamp>`.
+
+## ⚠️ Licenza
+
+Fornito "così com'è" senza garanzia. Usalo a tuo rischio.

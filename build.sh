@@ -21,6 +21,7 @@ mkdir -p "$OUT_DIR"
 cp -r \
     pyproject.toml \
     README.md \
+    README_IT.md \
     start.sh \
     start.bat \
     rpgm_tool.py \
