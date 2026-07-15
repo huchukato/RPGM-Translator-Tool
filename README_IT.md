@@ -2,8 +2,6 @@
 
 ![RPGM-Translator Logo](logo_512.png)
 
-![RPGM-Translator GUI](translator-gui.png)
-
 ![Python](https://img.shields.io/badge/python-3.9+-06b6d4.svg)
 ![Version](https://img.shields.io/badge/version-1.0.0-10b981.svg)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-7c3aed.svg)
@@ -12,6 +10,8 @@
 Uno strumento GUI per tradurre automaticamente giochi **RPG Maker MV/MZ**.
 
 Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di **WTForge**.
+
+![RPGM-Translator GUI](translator-gui.png)
 
 ## ✨ Funzionalità
 
