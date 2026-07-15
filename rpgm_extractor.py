@@ -1,0 +1,50 @@
+"""
+RPGM-Translator - Extractor
+Coordina il rilevamento del motore e l'estrazione delle stringhe traducibili.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Callable
+
+from rpgm_detector import detect_engine, DetectionError
+from rpgm_parser import ExtractedString, parse_data_file, parse_plugins_js
+
+
+class RPGMExtractor:
+    def __init__(self, game_path: Path):
+        info = detect_engine(game_path)
+        self.engine: str = info["engine"]
+        self.root: Path = info["root"]
+        self.data_dir: Path = info["data_dir"]
+        self.www_dir: Path = info["www_dir"]
+        self.items: list[ExtractedString] = []
+        self.files_count: int = 0
+
+    def extract(self, progress_cb: Callable[[int, int, str], None] | None = None) -> list[ExtractedString]:
+        """Estrae tutte le stringhe localizzabili dal gioco."""
+        data_files = sorted(self.data_dir.glob("*.json"))
+        plugins_js = self.www_dir / "js" / "plugins.js"
+
+        total = len(data_files) + (1 if plugins_js.exists() else 0)
+        done = 0
+        idx_ref = [0]
+        items: list[ExtractedString] = []
+
+        for file_path in data_files:
+            file_name = file_path.name
+            items.extend(parse_data_file(file_path, file_name, idx_ref))
+            done += 1
+            if progress_cb:
+                progress_cb(done, total, f"Parsing {file_name}")
+
+        if plugins_js.exists():
+            items.extend(parse_plugins_js(plugins_js, idx_ref))
+            done += 1
+            if progress_cb:
+                progress_cb(done, total, "Parsing plugins.js")
+
+        self.files_count = total
+        self.items = items
+        return items

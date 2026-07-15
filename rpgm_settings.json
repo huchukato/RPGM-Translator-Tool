@@ -1,0 +1,12 @@
+{
+  "target_lang": "Italian",
+  "backend": "google_turbo",
+  "translation_profile": "Fast",
+  "preserve_names": true,
+  "last_game_dir": "/Volumes/NVME/Down/Symphony_of_the_Serpent-.71071-Windows",
+  "openrouter_api_key": "",
+  "openrouter_model": "google/gemma-2-9b-it:free",
+  "llama_model_repo": "llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF",
+  "llama_model_file": "",
+  "last_game_path": "/Volumes/NVME/Down/Symphony_of_the_Serpent-.71071-Windows"
+}

@@ -1,0 +1,724 @@
+#!/usr/bin/env python3
+"""
+RPGM-Translator - Main GUI
+Interfaccia stile WTForge, flusso di traduzione di Ren'Py Translator.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import threading
+import tkinter as tk
+from pathlib import Path
+from typing import Any
+
+import customtkinter as ctk
+from PIL import Image, ImageTk
+from tkinter import filedialog, messagebox
+
+from rpgm_detector import detect_engine, DetectionError
+from rpgm_extractor import RPGMExtractor
+from rpgm_parser import ExtractedString
+from rpgm_settings import (
+    BACKEND_LABELS, BACKENDS, DEFAULT_SETTINGS, LANGUAGES, SETTINGS_FILE,
+    UI_TEXTS, load_settings, save_settings, t,
+)
+from rpgm_translator import OPENROUTER_FREE_MODELS, Translator, TranslatorConfig, TranslationError
+from rpgm_writer import (
+    WriteError, backup_data_dir, export_patch, patch_data_files, save_local_cache,
+)
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+# Palette ispirata al logo: nero, ciano, magenta, viola e accenti dorati
+COLOR_BG = "#0c0a12"
+COLOR_PANEL = "#18122b"
+COLOR_ACCENT = "#06b6d4"
+COLOR_ACCENT_MAGENTA = "#ec4899"
+COLOR_ACCENT_GOLD = "#f59e0b"
+COLOR_BTN_MAIN = "#7c3aed"
+COLOR_BTN_ALT = "#ec4899"
+COLOR_BTN_WARN = "#f59e0b"
+COLOR_BTN_SUCCESS = "#10b981"
+COLOR_TEXT = "#f8fafc"
+COLOR_SUBTEXT = "#a78bfa"
+COLOR_ROW_EVEN = "#0c0a12"
+COLOR_ROW_ODD = "#18122b"
+COLOR_SELECTED = "#0e7490"
+
+APP_TITLE = "RPGM Translator"
+VERSION = "1.0.0"
+SCRIPT_DIR = Path(__file__).parent
+
+
+class SettingsDialog(ctk.CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.title(t(parent.current_lang, "settings_title"))
+        self.geometry("500x420")
+        self.resizable(False, False)
+        self.grab_set()
+        self._build()
+        self._load()
+
+    def _build(self):
+        pad = {"padx": 16, "pady": 6}
+        ctk.CTkLabel(self, text=t(self.parent.current_lang, "openrouter_key")).pack(anchor="w", **pad)
+        self.or_key = ctk.CTkEntry(self, width=460, show="*")
+        self.or_key.pack(**pad)
+
+        ctk.CTkLabel(self, text=t(self.parent.current_lang, "openrouter_model")).pack(anchor="w", **pad)
+        self.or_model = ctk.CTkComboBox(self, values=OPENROUTER_FREE_MODELS, width=460)
+        self.or_model.pack(**pad)
+
+        ctk.CTkLabel(self, text=t(self.parent.current_lang, "llama_repo")).pack(anchor="w", **pad)
+        self.llama_repo = ctk.CTkEntry(self, width=460)
+        self.llama_repo.pack(**pad)
+
+        ctk.CTkLabel(self, text=t(self.parent.current_lang, "llama_file")).pack(anchor="w", **pad)
+        self.llama_file = ctk.CTkEntry(self, width=460)
+        self.llama_file.pack(**pad)
+
+        ctk.CTkButton(self, text="Save", command=self._save, fg_color=COLOR_BTN_MAIN).pack(pady=12)
+
+    def _load(self):
+        s = self.parent.settings
+        self.or_key.insert(0, s.get("openrouter_api_key", ""))
+        self.or_model.set(s.get("openrouter_model", OPENROUTER_FREE_MODELS[0]))
+        self.llama_repo.insert(0, s.get("llama_model_repo", DEFAULT_SETTINGS["llama_model_repo"]))
+        self.llama_file.insert(0, s.get("llama_model_file", ""))
+
+    def _save(self):
+        self.parent.settings.update({
+            "openrouter_api_key": self.or_key.get().strip(),
+            "openrouter_model": self.or_model.get(),
+            "llama_model_repo": self.llama_repo.get().strip(),
+            "llama_model_file": self.llama_file.get().strip(),
+        })
+        self.parent._save_settings()
+        self.destroy()
+
+
+class RPGMTranslatorApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title(APP_TITLE)
+        self.geometry("1200x780")
+        self.minsize(950, 650)
+        self.configure(fg_color=COLOR_BG)
+
+        self.current_lang = "en"
+        self.settings = load_settings()
+        self.game_path: Path | None = None
+        self.extractor: RPGMExtractor | None = None
+        self.items: list[ExtractedString] = []
+        self.filtered: list[ExtractedString] = []
+        self.translator: Translator | None = None
+        self._page = 0
+        self._page_size = 100
+        self._selected_index: int | None = None
+        self._analysis_done = False
+
+        self._build_ui()
+        self._set_icon()
+        self._restore_last_game()
+
+    # ─── UI Build ──────────────────────────────────────────────────────────
+
+    def _build_ui(self):
+        # Top bar
+        top = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=90)
+        top.pack(fill="x", padx=0, pady=0)
+        top.pack_propagate(False)
+
+        self.logo_label = ctk.CTkLabel(top, text="")
+        self.logo_label.pack(side="left", padx=12, pady=8)
+        self._set_logo(top)
+
+        game_frame = ctk.CTkFrame(top, fg_color="transparent")
+        game_frame.pack(side="left", fill="both", expand=True, padx=8)
+
+        self.game_section_label = ctk.CTkLabel(game_frame, text=t(self.current_lang, "game_selection"),
+                                             font=ctk.CTkFont(size=12, weight="bold"),
+                                             text_color=COLOR_SUBTEXT)
+        self.game_section_label.pack(anchor="w")
+
+        path_row = ctk.CTkFrame(game_frame, fg_color="transparent")
+        path_row.pack(fill="x")
+        self.path_entry = ctk.CTkEntry(path_row, width=520, placeholder_text="...")
+        self.path_entry.pack(side="left", padx=(0, 6))
+        ctk.CTkButton(path_row, text=t(self.current_lang, "btn_app"), width=60,
+                      fg_color=COLOR_ACCENT, command=self._pick_app).pack(side="left", padx=2)
+        ctk.CTkButton(path_row, text=t(self.current_lang, "btn_folder"), width=80,
+                      fg_color=COLOR_ACCENT, command=self._pick_folder).pack(side="left", padx=2)
+
+        self.game_status = ctk.CTkLabel(game_frame, text=t(self.current_lang, "no_game"),
+                                        text_color=COLOR_SUBTEXT, font=ctk.CTkFont(size=11))
+        self.game_status.pack(anchor="w")
+
+        # Progress
+        prog_frame = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=36)
+        prog_frame.pack(fill="x", padx=0, pady=(2, 0))
+        prog_frame.pack_propagate(False)
+        self.progress = ctk.CTkProgressBar(prog_frame, height=14)
+        self.progress.pack(side="left", fill="x", expand=True, padx=12, pady=10)
+        self.progress.set(0)
+        self.progress_label = ctk.CTkLabel(prog_frame, text="", text_color=COLOR_SUBTEXT,
+                                           font=ctk.CTkFont(size=11))
+        self.progress_label.pack(side="right", padx=12)
+
+        # Filter + controls row
+        ctrl = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=44)
+        ctrl.pack(fill="x", pady=(2, 0))
+        ctrl.pack_propagate(False)
+
+        ctk.CTkLabel(ctrl, text="Filter:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(12, 4))
+        self.filter_var = ctk.StringVar(value="all")
+        for val, key in [("all", "filter_all"), ("translated", "filter_translated"),
+                         ("untranslated", "filter_untranslated")]:
+            rb = ctk.CTkRadioButton(ctrl, text=t(self.current_lang, key), variable=self.filter_var,
+                                    value=val, command=self._apply_filter)
+            rb.pack(side="left", padx=4)
+
+        ctk.CTkLabel(ctrl, text=t(self.current_lang, "target_lang"), text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
+        self.lang_var = ctk.StringVar(value=self.settings.get("target_lang", "Italian"))
+        self.lang_combo = ctk.CTkComboBox(ctrl, values=list(LANGUAGES.keys()), width=130,
+                                          variable=self.lang_var, command=self._on_target_lang_change)
+        self.lang_combo.pack(side="left", padx=4)
+
+        ctk.CTkLabel(ctrl, text=t(self.current_lang, "backend"), text_color=COLOR_SUBTEXT).pack(side="left", padx=(16, 4))
+        saved_backend = self.settings.get("backend", "bing_ultra")
+        self.backend_var = ctk.StringVar(value=BACKEND_LABELS.get(saved_backend, "Bing Turbo"))
+        self.backend_combo = ctk.CTkComboBox(ctrl, values=list(BACKENDS), width=140,
+                                             variable=self.backend_var, command=self._on_backend_change)
+        self.backend_combo.pack(side="left", padx=4)
+
+        ctk.CTkLabel(ctrl, text=t(self.current_lang, "profile"), text_color=COLOR_SUBTEXT).pack(side="left", padx=(12, 4))
+        self.profile_var = ctk.StringVar(value=self.settings.get("translation_profile", "Balanced"))
+        self.profile_combo = ctk.CTkComboBox(ctrl, values=["Safe", "Balanced", "Fast"], width=105,
+                                             variable=self.profile_var, command=self._on_profile_change)
+        self.profile_combo.pack(side="left", padx=4)
+
+        # Tabs
+        self.tabs = ctk.CTkTabview(self, fg_color=COLOR_PANEL)
+        self.tabs.pack(fill="both", expand=True, padx=0, pady=(2, 0))
+        self.tab_strings = self.tabs.add(t(self.current_lang, "strings_tab"))
+        self.tab_log = self.tabs.add(t(self.current_lang, "log_tab"))
+        self._build_strings_tab()
+        self._build_log_tab()
+
+        # Bottom buttons
+        bottom = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=56)
+        bottom.pack(fill="x", pady=(2, 0))
+        bottom.pack_propagate(False)
+
+        self.btn_translate = ctk.CTkButton(bottom, text=f"▶  {t(self.current_lang, 'analyze_translate')}",
+                                           fg_color=COLOR_BTN_SUCCESS, hover_color="#047857",
+                                           width=180, command=self._analyze_translate)
+        self.btn_translate.pack(side="left", padx=10, pady=10)
+
+        self.btn_save = ctk.CTkButton(bottom, text=t(self.current_lang, "save"),
+                                      fg_color=COLOR_ACCENT, width=110, command=self._save_translation)
+        self.btn_save.pack(side="left", padx=6, pady=10)
+        self.btn_save.configure(state="disabled")
+
+        self.btn_export = ctk.CTkButton(bottom, text=t(self.current_lang, "export"),
+                                        fg_color=COLOR_ACCENT_MAGENTA, width=110, command=self._export_patch)
+        self.btn_export.pack(side="left", padx=6, pady=10)
+        self.btn_export.configure(state="disabled")
+
+        ctk.CTkButton(bottom, text=t(self.current_lang, "settings"), fg_color=COLOR_ACCENT,
+                      width=100, command=self._open_settings).pack(side="right", padx=10, pady=10)
+
+        next_lang = "IT" if self.current_lang == "en" else "EN"
+        ctk.CTkButton(bottom, text=next_lang, fg_color=COLOR_ACCENT,
+                      width=50, command=self._toggle_lang).pack(side="right", padx=6, pady=10)
+
+        # Options row
+        opts = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=44)
+        opts.pack(fill="x")
+        opts.pack_propagate(False)
+
+        ctk.CTkLabel(opts, text="Options:", text_color=COLOR_SUBTEXT,
+                     font=ctk.CTkFont(size=11)).pack(side="left", padx=(12, 8), pady=10)
+
+        self.preserve_names_var = ctk.BooleanVar(value=self.settings.get("preserve_names", False))
+        ctk.CTkSwitch(opts, text=t(self.current_lang, "preserve_names"), variable=self.preserve_names_var,
+                      command=self._on_option_change,
+                      onvalue=True, offvalue=False).pack(side="left", padx=10, pady=8)
+
+    def _build_strings_tab(self):
+        self.tab_strings.grid_rowconfigure(0, weight=1)
+        self.tab_strings.grid_columnconfigure(0, weight=1)
+
+        main_frame = ctk.CTkFrame(self.tab_strings, fg_color="transparent")
+        main_frame.grid(row=0, column=0, sticky="nsew")
+        main_frame.grid_rowconfigure(0, weight=3)
+        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # Table area
+        table_outer = ctk.CTkFrame(main_frame, fg_color=COLOR_BG)
+        table_outer.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        table_outer.grid_rowconfigure(1, weight=1)
+        table_outer.grid_columnconfigure(0, weight=1)
+
+        # Header
+        header = ctk.CTkFrame(table_outer, fg_color=COLOR_ACCENT, height=28)
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 2))
+        header.grid_propagate(False)
+        cols = [
+            (t(self.current_lang, "col_num"), 50),
+            (t(self.current_lang, "col_kind"), 90),
+            (t(self.current_lang, "col_original"), 420),
+            (t(self.current_lang, "col_translation"), 420),
+            (t(self.current_lang, "col_file"), 180),
+        ]
+        for text, width in cols:
+            ctk.CTkLabel(header, text=text, width=width,
+                         font=ctk.CTkFont(weight="bold"), anchor="w",
+                         text_color=COLOR_TEXT).pack(side="left", padx=4, pady=2)
+
+        self.table_frame = ctk.CTkScrollableFrame(table_outer, fg_color=COLOR_BG)
+        self.table_frame.grid(row=1, column=0, sticky="nsew")
+
+        # Pagination
+        pag = ctk.CTkFrame(table_outer, fg_color=COLOR_PANEL, height=32)
+        pag.grid(row=2, column=0, sticky="ew", pady=(4, 0))
+        pag.grid_propagate(False)
+        ctk.CTkButton(pag, text="◀", width=36, fg_color=COLOR_ACCENT,
+                      command=self._prev_page).pack(side="left", padx=6, pady=4)
+        self.page_label = ctk.CTkLabel(pag, text="", text_color=COLOR_SUBTEXT, font=ctk.CTkFont(size=11))
+        self.page_label.pack(side="left", padx=8)
+        ctk.CTkButton(pag, text="▶", width=36, fg_color=COLOR_ACCENT,
+                      command=self._next_page).pack(side="left", padx=2, pady=4)
+
+        # Editor area
+        editor_frame = ctk.CTkFrame(main_frame, fg_color=COLOR_PANEL)
+        editor_frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        editor_frame.grid_columnconfigure(0, weight=1)
+        editor_frame.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(editor_frame, text="Edit selected translation:", text_color=COLOR_SUBTEXT,
+                     font=ctk.CTkFont(size=11)).grid(row=0, column=0, sticky="w", padx=10, pady=(6, 2))
+        self.edit_text = ctk.CTkTextbox(editor_frame, height=80, font=ctk.CTkFont(size=12))
+        self.edit_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
+        self.edit_text.configure(state="disabled")
+
+        btn_row = ctk.CTkFrame(editor_frame, fg_color="transparent")
+        btn_row.grid(row=2, column=0, sticky="e", padx=10, pady=(0, 6))
+        self.btn_edit_save = ctk.CTkButton(btn_row, text="Save Edit", width=100,
+                                           fg_color=COLOR_BTN_MAIN, command=self._save_edit)
+        self.btn_edit_save.pack(side="left", padx=4)
+        self.btn_edit_save.configure(state="disabled")
+
+    def _build_log_tab(self):
+        self.tab_log.grid_rowconfigure(0, weight=1)
+        self.tab_log.grid_columnconfigure(0, weight=1)
+        self.log_text = ctk.CTkTextbox(self.tab_log, fg_color=COLOR_BG,
+                                       font=ctk.CTkFont(family="Courier", size=11))
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+
+    def _set_icon(self):
+        icon_path = SCRIPT_DIR / "logo_256.png"
+        if icon_path.exists():
+            self._tk_icon = ImageTk.PhotoImage(Image.open(icon_path))
+            self.iconphoto(True, self._tk_icon)
+
+    def _set_logo(self, parent):
+        for candidate in ("logo_512.png", "logo_256.png", "logo_48.png"):
+            logo_path = SCRIPT_DIR / candidate
+            if logo_path.exists():
+                pil_img = Image.open(logo_path)
+                self._ctk_logo = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(64, 64))
+                self.logo_label.configure(image=self._ctk_logo, text="")
+                return
+
+    # ─── Helpers ─────────────────────────────────────────────────────────
+
+    def _t(self, key: str, *args) -> str:
+        return t(self.current_lang, key, *args)
+
+    def log(self, message: str):
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", message + "\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    def root_after(self, func):
+        self.after(0, func)
+
+    def _set_progress(self, value: float, text: str = ""):
+        self.progress.set(max(0.0, min(1.0, value)))
+        self.progress_label.configure(text=text)
+
+    # ─── Table rendering ─────────────────────────────────────────────────
+
+    def _render_table(self, items: list[ExtractedString]):
+        self.filtered = items
+        self._page = 0
+        self._selected_index = None
+        self._render_page()
+
+    def _render_page(self):
+        for widget in self.table_frame.winfo_children():
+            widget.destroy()
+
+        items = self.filtered
+        start = self._page * self._page_size
+        end = start + self._page_size
+        page_items = items[start:end]
+
+        for i, item in enumerate(page_items):
+            abs_i = start + i
+            bg = COLOR_ROW_EVEN if abs_i % 2 == 0 else COLOR_ROW_ODD
+            if self._selected_index is not None and abs_i == self._selected_index:
+                bg = COLOR_SELECTED
+            row = ctk.CTkFrame(self.table_frame, fg_color=bg, height=28)
+            row.pack(fill="x", pady=(0, 1))
+            row.pack_propagate(False)
+
+            cols_w = [50, 90, 420, 420, 180]
+            vals = [
+                str(abs_i + 1),
+                item.kind,
+                item.text[:70],
+                (item.translated or "")[:70],
+                item.file,
+            ]
+            for val, w in zip(vals, cols_w):
+                lbl = ctk.CTkLabel(row, text=val, width=w, anchor="w",
+                                   text_color=COLOR_TEXT if item.translated else COLOR_SUBTEXT,
+                                   font=ctk.CTkFont(size=11))
+                lbl.pack(side="left", padx=4, pady=2)
+
+            def make_click(idx=abs_i, it=item):
+                return lambda event: self._on_row_click(idx, it)
+            row.bind("<Button-1>", make_click())
+            for child in row.winfo_children():
+                child.bind("<Button-1>", make_click())
+
+        total_pages = max(1, (len(items) + self._page_size - 1) // self._page_size)
+        self.page_label.configure(text=f"Page {self._page + 1} / {total_pages}  ({len(items)} strings)")
+
+    def _on_row_click(self, abs_i: int, item: ExtractedString):
+        self._selected_index = abs_i
+        self._render_page()
+        self.edit_text.configure(state="normal")
+        self.edit_text.delete("1.0", "end")
+        self.edit_text.insert("end", item.translated if item.translated else "")
+        self.edit_text.configure(state="normal")
+        self.btn_edit_save.configure(state="normal")
+
+    def _save_edit(self):
+        if self._selected_index is None or self._selected_index >= len(self.filtered):
+            return
+        item = self.filtered[self._selected_index]
+        item.translated = self.edit_text.get("1.0", "end-1c")
+        self._render_page()
+        self.btn_save.configure(state="normal")
+        self.btn_export.configure(state="disabled")
+
+    def _prev_page(self):
+        if self._page > 0:
+            self._page -= 1
+            self._render_page()
+
+    def _next_page(self):
+        total_pages = max(1, (len(self.filtered) + self._page_size - 1) // self._page_size)
+        if self._page < total_pages - 1:
+            self._page += 1
+            self._render_page()
+
+    def _apply_filter(self):
+        f = self.filter_var.get()
+        if f == "translated":
+            visible = [i for i in self.items if i.translated]
+        elif f == "untranslated":
+            visible = [i for i in self.items if not i.translated]
+        else:
+            visible = self.items
+        self._render_table(visible)
+
+    # ─── Game Selection ──────────────────────────────────────────────────
+
+    def _pick_app(self):
+        initialdir = self.settings.get("last_game_dir", str(Path.home() / "Downloads"))
+        path = filedialog.askopenfilename(title=self._t("select_app"), initialdir=initialdir)
+        if path:
+            self._set_game(Path(path))
+
+    def _pick_folder(self):
+        initialdir = self.settings.get("last_game_dir", str(Path.home() / "Downloads"))
+        path = filedialog.askdirectory(title=self._t("select_folder"), initialdir=initialdir)
+        if path:
+            self._set_game(Path(path))
+
+    def _set_game(self, path: Path):
+        try:
+            info = detect_engine(path)
+        except DetectionError as e:
+            messagebox.showerror(self._t("error"), str(e))
+            return
+        self.game_path = path
+        self.extractor = None
+        self.items = []
+        self.filtered = []
+        self._analysis_done = False
+        self.settings["last_game_path"] = str(path)
+        self.settings["last_game_dir"] = str(path if path.is_dir() else path.parent)
+        self._save_settings()
+        self.path_entry.delete(0, tk.END)
+        self.path_entry.insert(0, str(path))
+        engine_label = info.get("engine", "mv").upper()
+        self.game_status.configure(text=f"{self._t('game_selected')}: {path.name}  |  {self._t('detected_engine')}: {engine_label}",
+                                   text_color=COLOR_BTN_MAIN)
+        self._render_table([])
+        self.log(f"Selected game: {path}")
+        self.log(f"Detected engine: {engine_label}")
+
+    # ─── Pipelines ───────────────────────────────────────────────────────
+
+    def _analyze_only(self):
+        if not self.game_path:
+            messagebox.showerror(self._t("error"), self._t("select_game_first"))
+            return
+        self._reset_ui_for_work()
+        threading.Thread(target=self._analyze_thread, daemon=True).start()
+
+    def _analyze_translate(self):
+        if not self.game_path:
+            messagebox.showerror(self._t("error"), self._t("select_game_first"))
+            return
+        self._reset_ui_for_work()
+        threading.Thread(target=self._analyze_translate_thread, daemon=True).start()
+
+    def _reset_ui_for_work(self):
+        self.btn_translate.configure(state="disabled")
+        self.btn_save.configure(state="disabled")
+        self.btn_export.configure(state="disabled")
+        self.progress.set(0)
+
+    def _on_work_done(self):
+        self.btn_translate.configure(state="normal")
+        if self.items and self.game_path:
+            self.btn_save.configure(state="normal")
+        self._apply_filter()
+
+    def _cancel(self):
+        if self.translator:
+            self.translator.cancel()
+
+    # ─── Threads ─────────────────────────────────────────────────────────
+
+    def _analyze_thread(self):
+        try:
+            self.log(f"Starting analysis of: {self.game_path}")
+            self.root_after(lambda: self._set_progress(0.1, self._t("progress_analyzing")))
+            self.extractor = RPGMExtractor(self.game_path)
+            self.items = self.extractor.extract(
+                progress_cb=lambda c, t, msg: self.root_after(
+                    lambda c=c, t=t: self._set_progress(0.1 + 0.2 * (c / max(t, 1)), msg)
+                )
+            )
+            self._analysis_done = True
+            msg = self._t("analysis_complete", len(self.items), self.extractor.files_count)
+            self.log(msg)
+            self.root_after(lambda: self._set_progress(1.0, msg))
+            self.root_after(self._on_work_done)
+        except Exception as e:
+            self._handle_error(e)
+
+    def _translate_thread(self):
+        try:
+            targets = [i for i in self.items if not i.translated]
+            if not targets:
+                self.log("No untranslated strings.")
+                self.root_after(self._on_work_done)
+                return
+            self._do_translate(targets)
+            self.root_after(self._on_work_done)
+        except Exception as e:
+            self._handle_error(e)
+
+    def _analyze_translate_thread(self):
+        try:
+            # Analyze
+            self.log(f"Starting analysis & translation for: {self.game_path}")
+            self.root_after(lambda: self._set_progress(0.05, self._t("progress_analyzing")))
+            self.extractor = RPGMExtractor(self.game_path)
+            self.items = self.extractor.extract(
+                progress_cb=lambda c, t, msg: self.root_after(
+                    lambda c=c, t=t: self._set_progress(0.05 + 0.45 * (c / max(t, 1)), msg)
+                )
+            )
+            self._analysis_done = True
+            self.log(self._t("analysis_complete", len(self.items), self.extractor.files_count))
+
+            # Translate
+            self._do_translate(self.items, base_progress=0.5, range_progress=0.5)
+
+            self.root_after(lambda: self._set_progress(1.0, self._t("translation_complete",
+                                                                   sum(1 for i in self.items if i.translated),
+                                                                   len(self.items))))
+            self.root_after(self._on_work_done)
+            self.root_after(lambda: messagebox.showinfo(self._t("translation_complete_title"),
+                                                          self._t("translation_complete_msg")))
+        except Exception as e:
+            self._handle_error(e)
+
+    def _do_translate(self, targets: list[ExtractedString], base_progress: float = 0.0, range_progress: float = 1.0):
+        if not targets:
+            return
+        self.root_after(lambda: self._set_progress(base_progress, self._t("progress_translating")))
+        cfg = self._make_config()
+        self.translator = Translator(cfg)
+        texts = [i.text for i in targets]
+
+        def _progress(done, total):
+            frac = base_progress + (done / max(total, 1)) * range_progress
+            self.root_after(lambda: self._set_progress(frac, f"{int(frac * 100)}%  ({done}/{total})"))
+
+        result = self.translator.translate_many(texts, progress_cb=_progress)
+        for item in targets:
+            item.translated = result.get(item.text, "")
+        done = sum(1 for i in self.items if i.translated)
+        msg = self._t("translation_complete", done, len(self.items))
+        self.log(msg)
+        self.root_after(lambda: self._set_progress(base_progress + range_progress, msg))
+
+    def _make_config(self) -> TranslatorConfig:
+        lang_name = self.lang_var.get()
+        target = LANGUAGES.get(lang_name, "it")
+        s = self.settings
+        return TranslatorConfig(
+            backend=BACKENDS[self.backend_var.get()],
+            source_lang="en",
+            target_lang=target,
+            libre_endpoint=s.get("libre_endpoint", "http://localhost:5000"),
+            openrouter_api_key=s.get("openrouter_api_key", ""),
+            openrouter_model=s.get("openrouter_model", OPENROUTER_FREE_MODELS[0]),
+            llama_model_repo=s.get("llama_model_repo", DEFAULT_SETTINGS["llama_model_repo"]),
+            llama_model_file=s.get("llama_model_file", ""),
+            translation_profile=self.profile_var.get(),
+            preserve_names=bool(self.preserve_names_var.get()),
+            translate_menu=False,
+        )
+
+    # ─── Save / Export ─────────────────────────────────────────────────────
+
+    def _save_translation(self):
+        if not self.game_path or not self.extractor or not self.items:
+            return
+        self._reset_ui_for_work()
+        threading.Thread(target=self._save_thread, daemon=True).start()
+
+    def _save_thread(self):
+        try:
+            self.root_after(lambda: self._set_progress(0.5, self._t("progress_saving")))
+            self._do_save()
+            msg = self._t("saved", len([i for i in self.items if i.translated]), self.extractor.root)
+            self.log(msg)
+            self.root_after(lambda: self._set_progress(1.0, msg))
+            self.root_after(self._on_work_done)
+            self.root_after(lambda: self.btn_export.configure(state="normal"))
+        except Exception as e:
+            self._handle_error(e)
+
+    def _do_save(self):
+        if not self.game_path or not self.extractor:
+            return
+        self.log("Creating backup...")
+        backup_data_dir(self.extractor.root)
+        self.log("Patching game data...")
+        patched = patch_data_files(self.extractor.root, self.items)
+        self.log(f"Patched {patched} strings.")
+        cfg = self._make_config()
+        cfg_key = f"{cfg.source_lang}|{cfg.target_lang}|{cfg.backend}"
+        save_local_cache(self.extractor.root, cfg_key, self.items)
+        self.log("Local cache saved.")
+
+    def _export_patch(self):
+        if not self.game_path or not self.extractor:
+            return
+        lang_code = LANGUAGES.get(self.lang_var.get(), "it")
+        default_name = f"{self.extractor.root.name}-{lang_code}"
+        dest = filedialog.askdirectory(title=f"Export patch for '{default_name}'")
+        if not dest:
+            return
+        threading.Thread(target=self._export_thread, args=(Path(dest), lang_code), daemon=True).start()
+
+    def _export_thread(self, dest: Path, lang_code: str):
+        try:
+            self.root_after(lambda: self._set_progress(0.5, self._t("progress_exporting")))
+            export_dir = export_patch(self.extractor.root, dest, lang_code)
+            msg = self._t("exported", export_dir)
+            self.log(msg)
+            self.root_after(lambda: self._set_progress(1.0, msg))
+            self.root_after(self._on_work_done)
+        except Exception as e:
+            self._handle_error(e)
+
+    # ─── Settings & Options ──────────────────────────────────────────────
+
+    def _open_settings(self):
+        SettingsDialog(self)
+
+    def _toggle_lang(self):
+        self.current_lang = "it" if self.current_lang == "en" else "en"
+        self._rebuild_ui()
+
+    def _rebuild_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._build_ui()
+        self._apply_filter()
+
+    def _on_target_lang_change(self, language: str):
+        self.settings["target_lang"] = language
+        self._save_settings()
+
+    def _on_backend_change(self, label: str):
+        self.settings["backend"] = BACKENDS[label]
+        self._save_settings()
+
+    def _on_profile_change(self, profile: str):
+        self.settings["translation_profile"] = profile
+        self._save_settings()
+
+    def _on_option_change(self):
+        self.settings["preserve_names"] = bool(self.preserve_names_var.get())
+        self._save_settings()
+
+    def _load_settings(self):
+        self.settings = load_settings()
+
+    def _save_settings(self):
+        save_settings(self.settings)
+
+    def _restore_last_game(self):
+        last = self.settings.get("last_game_path")
+        if last:
+            p = Path(last)
+            if p.exists():
+                self._set_game(p)
+
+    # ─── Error handling ───────────────────────────────────────────────────
+
+    def _handle_error(self, exc: Exception):
+        err = str(exc)
+        self.log(f"Error: {err}")
+        self.root_after(lambda: messagebox.showerror(self._t("error"), err))
+        self.root_after(self._on_work_done)
+
+
+def main():
+    app = RPGMTranslatorApp()
+    app.mainloop()
+
+
+if __name__ == "__main__":
+    main()
