@@ -31,6 +31,7 @@ cp -r \
     rpgm_writer.py \
     rpgm_translator.py \
     rpgm_settings.py \
+    rpgm_forge.py \
     logo_*.png \
     splash.jpg \
     "$OUT_DIR/"

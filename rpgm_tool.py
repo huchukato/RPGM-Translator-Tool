@@ -19,6 +19,7 @@ from tkinter import filedialog, messagebox
 
 from rpgm_detector import detect_engine, DetectionError
 from rpgm_extractor import RPGMExtractor
+from rpgm_forge import ensure_forge_js, install_forge, FORGE_CACHE_FILE
 from rpgm_parser import ExtractedString
 from rpgm_settings import (
     BACKEND_LABELS, BACKENDS, DEFAULT_SETTINGS, LANGUAGES, SETTINGS_FILE,
@@ -229,6 +230,11 @@ class RPGMTranslatorApp(ctk.CTk):
                                         fg_color=COLOR_ACCENT_MAGENTA, width=110, command=self._export_patch)
         self.btn_export.pack(side="left", padx=6, pady=10)
         self.btn_export.configure(state="disabled")
+
+        self.btn_forge = ctk.CTkButton(bottom, text=t(self.current_lang, "install_forge"),
+                                       fg_color=COLOR_ACCENT_GOLD, width=140, command=self._install_forge)
+        self.btn_forge.pack(side="left", padx=6, pady=10)
+        self.btn_forge.configure(state="disabled")
 
         ctk.CTkButton(bottom, text=t(self.current_lang, "settings"), fg_color=COLOR_ACCENT,
                       width=100, command=self._open_settings).pack(side="right", padx=10, pady=10)
@@ -476,6 +482,10 @@ class RPGMTranslatorApp(ctk.CTk):
         engine_label = info.get("engine", "mv").upper()
         self.game_status.configure(text=f"{self._t('game_selected')}: {path.name}  |  {self._t('detected_engine')}: {engine_label}",
                                    text_color=COLOR_BTN_MAIN)
+        self.btn_translate.configure(state="normal")
+        self.btn_forge.configure(state="normal")
+        self.btn_save.configure(state="disabled")
+        self.btn_export.configure(state="disabled")
         self._render_table([])
         self.log(f"Selected game: {path}")
         self.log(f"Detected engine: {engine_label}")
@@ -500,10 +510,13 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_translate.configure(state="disabled")
         self.btn_save.configure(state="disabled")
         self.btn_export.configure(state="disabled")
+        self.btn_forge.configure(state="disabled")
         self.progress.set(0)
 
     def _on_work_done(self):
         self.btn_translate.configure(state="normal")
+        if self.game_path:
+            self.btn_forge.configure(state="normal")
         if self.items and self.game_path:
             self.btn_save.configure(state="normal")
         self._apply_filter()
@@ -511,6 +524,38 @@ class RPGMTranslatorApp(ctk.CTk):
     def _cancel(self):
         if self.translator:
             self.translator.cancel()
+
+    def _install_forge(self):
+        if not self.game_path:
+            messagebox.showerror(self._t("error"), self._t("select_game_first"))
+            return
+        forge_path = ensure_forge_js()
+        if not forge_path:
+            selected = filedialog.askopenfilename(
+                parent=self,
+                title=self._t("forge_select_file"),
+                filetypes=[("JavaScript files", "*.js"), ("All files", "*.*")],
+            )
+            if not selected:
+                return
+            forge_path = ensure_forge_js(Path(selected))
+            if not forge_path:
+                messagebox.showerror(self._t("error"), self._t("forge_select_file"))
+                return
+        self._reset_ui_for_work()
+        threading.Thread(target=self._install_forge_thread, args=(forge_path,), daemon=True).start()
+
+    def _install_forge_thread(self, forge_path: Path):
+        try:
+            self.root_after(lambda: self._set_progress(0.5, self._t("install_forge")))
+            result = install_forge(self.game_path, forge_path, key="1")
+            msg = self._t("forge_installed", result["forge_js"], result["key"])
+            self.log(msg)
+            self.root_after(lambda: self._set_progress(1.0, msg))
+            self.root_after(self._on_work_done)
+            self.root_after(lambda: messagebox.showinfo(self._t("forge_installed_title"), msg))
+        except Exception as e:
+            self._handle_error(e)
 
     # ─── Threads ─────────────────────────────────────────────────────────
 
