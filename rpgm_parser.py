@@ -39,6 +39,22 @@ SKIP_KEYS = {
     "characterName", "battlerName", "faceName", "parallaxName",
     "battleback1Name", "battleback2Name", "pictureName",
     "title1Name", "title2Name", "note",
+    "fileName", "folder", "path", "directory", "src", "url",
+    "soundName", "imageName", "movieName", "animationName", "tilesetName",
+    "voiceName", "audioName", "videoName", "resourceName", "assetName",
+}
+
+# Contesti in cui la chiave "name" indica un asset (file audio/immagine/video)
+ASSET_CONTEXT_KEYS = {
+    "bgm", "bgs", "se", "me", "picture", "image", "animation", "tileset",
+    "parallax", "battleback1", "battleback2", "title1", "title2", "file",
+    "sound", "movie", "voice", "audio", "video", "titleBgm", "titleBgs",
+    "victoryMe", "defeatMe", "gameoverMe", "boatBgm", "shipBgm",
+    "airshipBgm", "airshipBgs", "attackSound", "recoverySound", "missSound",
+    "evasionSound", "magicEvasionSound", "magicReflectionSound", "shopSound",
+    "useSound", "equipSound", "saveSound", "loadSound", "battleStartSound",
+    "escapeSound", "enemyCollapseSound", "bossCollapse1Sound", "bossCollapse2Sound",
+    "actorDamageSound", "actorNoDamageSound", "actorRecoverySound", "attackMotion",
 }
 
 # Chiavi parametro plugin considerate sicure per testi
@@ -49,7 +65,14 @@ SAFE_PARAM_KEYS = [
     "confirm", "ok", "ng", "cancel", "yes", "no", "select",
 ]
 
-UNSAFE_PARAM_KEYS = {"dateselect", "dataselect", "selectid", "select_id"}
+UNSAFE_PARAM_KEYS = {
+    "dateselect", "dataselect", "selectid", "select_id",
+    "file", "filename", "folder", "path", "directory", "src", "url",
+    "sound", "soundname", "image", "imagename", "movie", "moviename",
+    "animation", "animationname", "tileset", "tilesetname", "voice", "voicename",
+    "audio", "audioname", "video", "videoname", "resource", "resourcename",
+    "asset", "assetname", "filetext", "filepath", "filefolder",
+}
 
 # Regex escape code RPG Maker: \X[123] oppure \{ \} \. \| \^ \$ \> \< \\ \!
 ESC_RE = re.compile(r"\\([A-Z])(\[\d+\])?|\\([{}!.|^$><\\])")
@@ -90,6 +113,14 @@ def restore_escape_codes(translated: str, parts: list[dict]) -> str:
     return result
 
 
+FILE_EXTENSIONS_RE = re.compile(
+    r"\.(ogg|m4a|mp3|wav|wma|aac|flac|png|jpe?g|gif|bmp|webp|tga|tiff?|svg|ico|"
+    r"webm|mp4|m4v|mov|avi|ogv|mkv|json|js|css|html|txt|xml|csv|ini|yaml|yml|"
+    r"rpgmvp|rpgmvo|rpgmvm|m4v|ttf|otf|woff2?|eot|fnt|db)$",
+    re.IGNORECASE,
+)
+
+
 def is_translatable_text(clean: str) -> bool:
     """Esclude stringhe che non sono testo da tradurre."""
     s = clean.strip()
@@ -97,6 +128,12 @@ def is_translatable_text(clean: str) -> bool:
         return False
     # Singolo carattere ASCII
     if len(s) == 1 and s.isascii():
+        return False
+    # Nomi file/asset audio, immagini, video, json, etc.
+    if FILE_EXTENSIONS_RE.search(s):
+        return False
+    # Path separati da / o \
+    if "/" in s or "\\" in s:
         return False
     # Solo simboli/numeri
     if re.fullmatch(r"[\d\s.,!?\-+%=*/<>()\[\]{}@#$^&;:'\"`~|\\/]+", s):
@@ -172,6 +209,8 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                 if file_name in ("Tilesets.json", "Animations.json", "Troops.json", "CommonEvents.json"):
                     return
                 if file_name.startswith("Map") and file_name.endswith(".json"):
+                    return
+                if any(k in ASSET_CONTEXT_KEYS for k in keys[:-1]):
                     return
             if key in TEXT_FIELDS:
                 add_text(val, key, keys)
