@@ -205,11 +205,11 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         ))
 
     def _is_script_literal_translatable(literal: str) -> bool:
-        """Controlla se una stringa letterale in uno script va tradotta.
+        r"""Controlla se una stringa letterale in uno script va tradotta.
 
         Accetta sia frasi con spazi che singole parole, ma evita identificatori
         tecnici del tipo GUI-MAP-Outskirts (nessuno spazio, trattini e maiuscole)
-        e stringhe con graffe/tilde non bilanciate che sembrano codice.
+        e stringhe con simboli di codice (es. $, {, }, [, ], <, >, =, +, \, /).
         """
         if not is_translatable_text(literal):
             return False
@@ -217,11 +217,14 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             # Identificatori come GUI-MAP-Outskirts: trattini e maiuscole
             if "-" in literal and re.search(r"[A-Z]", literal):
                 return False
-        # Se la stringa contiene graffe non bilanciate o un carattere di code injection,
+            # Espressioni tipo Math.random() o www.example.com: punto senza spazi
+            if "." in literal:
+                return False
+        # Se la stringa contiene graffe non bilanciate o simboli chiaramente di codice,
         # probabilmente è codice o placeholder, non testo visibile.
         if literal.count("{") != literal.count("}"):
             return False
-        if ">" in literal or "<" in literal:
+        if any(c in literal for c in "$[]<>+=\\/"):
             return False
         return True
 
@@ -324,35 +327,23 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                 if code in (320, 324):
                     add_text(val, "actor_name", keys)
                     return
+                if code in (402, 408):
+                    if is_translatable_text(val):
+                        add_text(val, "event_param", keys)
+                    return
                 if code in (355, 655):
                     if add_script_text(val, keys):
                         return
                     if val.startswith("テキスト-"):
                         add_text(val[5:], "inline_script", keys)
-                        return
-                if code == 122 and pi == 4:
-                    # Control Variables con operando script/stringa
-                    # Non usare fallback generico per evitare identificatori
+                    return
+                # Per tutti gli altri codici evento (122, 357, 356, 657 e
+                # plugin custom) estrai solo le stringhe letterali tra virgolette.
+                # Non tradurre mai il comando/plugin intero, altrimenti il
+                # gioco non lo riconosce e va in errore (es. .split() di undefined).
+                if isinstance(code, int):
                     add_script_text(val, keys)
                     return
-                if code in (357, 356):
-                    # Plugin Command: può contenere stringhe letterali o testo puro
-                    if add_script_text(val, keys):
-                        return
-                    if is_translatable_text(val):
-                        add_text(val, "plugin_command", keys)
-                        return
-                if code in (402, 408):
-                    if is_translatable_text(val):
-                        add_text(val, "event_param", keys)
-                        return
-                # Fallback generico per altri comandi evento che contengono
-                # parametri stringa traducibili (es. plugin personalizzati).
-                # Esplicitamente esclusi code 122/355/655/357/356/401/405/101/102/320/324.
-                if code not in (122, 355, 655, 357, 356, 401, 405, 101, 102, 320, 324, 402, 408):
-                    if is_translatable_text(val):
-                        add_text(val, "event_param", keys)
-                        return
         # Sezione terms
         if any(k == "terms" for k in keys):
             add_text(val, "term", keys)
