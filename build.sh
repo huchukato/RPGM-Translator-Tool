@@ -35,7 +35,7 @@ cp -r \
     forge.js \
     logo_*.png \
     translator-gui.png \
-    splash.jpg \
+    splash.png \
     "$OUT_DIR/"
 
 chmod +x "$OUT_DIR/start.sh"
