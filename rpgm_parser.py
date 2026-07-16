@@ -337,10 +337,13 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                     if val.startswith("テキスト-"):
                         add_text(val[5:], "inline_script", keys)
                     return
-                # Per tutti gli altri codici evento (122, 357, 356, 657 e
-                # plugin custom) estrai solo le stringhe letterali tra virgolette.
-                # Non tradurre mai il comando/plugin intero, altrimenti il
-                # gioco non lo riconosce e va in errore (es. .split() di undefined).
+                if code in (357, 356, 657):
+                    # Comandi plugin (MV/MZ/ custom): anche le stringhe letterali
+                    # all'interno sono spesso valori JSON/proprietà interne (es.
+                    # "Center", "Normal", "left"). Tradurle rompe i plugin.
+                    return
+                # Per tutti gli altri codici evento (es. 122) estrai solo le
+                # stringhe letterali tra virgolette.
                 if isinstance(code, int):
                     add_script_text(val, keys)
                     return
