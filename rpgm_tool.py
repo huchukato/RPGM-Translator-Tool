@@ -51,7 +51,7 @@ COLOR_ROW_ODD = "#18122b"
 COLOR_SELECTED = "#0e7490"
 
 APP_TITLE = "RPGM Translator"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SCRIPT_DIR = Path(__file__).parent
 
 
@@ -286,12 +286,31 @@ class RPGMTranslatorApp(ctk.CTk):
         # Table area
         table_outer = ctk.CTkFrame(main_frame, fg_color=COLOR_BG)
         table_outer.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-        table_outer.grid_rowconfigure(1, weight=1)
+        table_outer.grid_rowconfigure(2, weight=1)
         table_outer.grid_columnconfigure(0, weight=1)
+
+        search_row = ctk.CTkFrame(table_outer, fg_color=COLOR_PANEL, height=36)
+        search_row.grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        search_row.grid_propagate(False)
+        ctk.CTkLabel(search_row, text=t(self.current_lang, "search"), text_color=COLOR_SUBTEXT).pack(side="left", padx=(8, 4))
+        self.search_var = ctk.StringVar()
+        self.search_var.trace_add("write", lambda *_: self._apply_filter())
+        self.search_entry = ctk.CTkEntry(search_row, width=310, textvariable=self.search_var,
+                                         placeholder_text=t(self.current_lang, "search_placeholder"))
+        self.search_entry.pack(side="left", padx=(0, 6), pady=4)
+        self._search_scopes = {
+            t(self.current_lang, "search_original"): "original",
+            t(self.current_lang, "search_translation"): "translation",
+            t(self.current_lang, "search_both"): "both",
+        }
+        self.search_scope_var = ctk.StringVar(value=t(self.current_lang, "search_both"))
+        self.search_scope_combo = ctk.CTkComboBox(search_row, values=list(self._search_scopes), width=150,
+                                                   variable=self.search_scope_var, command=self._on_search_scope_change)
+        self.search_scope_combo.pack(side="left", padx=4, pady=4)
 
         # Header
         header = ctk.CTkFrame(table_outer, fg_color=COLOR_ACCENT, height=28)
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 2))
+        header.grid(row=1, column=0, sticky="ew", pady=(0, 2))
         header.grid_propagate(False)
         cols = [
             (t(self.current_lang, "col_num"), 50),
@@ -306,11 +325,11 @@ class RPGMTranslatorApp(ctk.CTk):
                          text_color=COLOR_TEXT).pack(side="left", padx=4, pady=2)
 
         self.table_frame = ctk.CTkScrollableFrame(table_outer, fg_color=COLOR_BG)
-        self.table_frame.grid(row=1, column=0, sticky="nsew")
+        self.table_frame.grid(row=2, column=0, sticky="nsew")
 
         # Pagination
         pag = ctk.CTkFrame(table_outer, fg_color=COLOR_PANEL, height=32)
-        pag.grid(row=2, column=0, sticky="ew", pady=(4, 0))
+        pag.grid(row=3, column=0, sticky="ew", pady=(4, 0))
         pag.grid_propagate(False)
         ctk.CTkButton(pag, text="◀", width=36, fg_color=COLOR_ACCENT,
                       command=self._prev_page).pack(side="left", padx=6, pady=4)
@@ -464,7 +483,23 @@ class RPGMTranslatorApp(ctk.CTk):
             visible = [i for i in self.items if not i.translated]
         else:
             visible = self.items
+
+        query = self.search_var.get().strip().casefold()
+        scope = self._search_scopes.get(self.search_scope_var.get(), "both")
+        if query:
+            def matches(item: ExtractedString) -> bool:
+                original = item.text.casefold()
+                translation = item.translated.casefold()
+                if scope == "original":
+                    return query in original
+                if scope == "translation":
+                    return query in translation
+                return query in original or query in translation
+            visible = [item for item in visible if matches(item)]
         self._render_table(visible)
+
+    def _on_search_scope_change(self, _value: str):
+        self._apply_filter()
 
     # ─── Game Selection ──────────────────────────────────────────────────
 

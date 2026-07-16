@@ -3,7 +3,7 @@
 ![RPGM-Translator Logo](logo_512.png)
 
 ![Python](https://img.shields.io/badge/python-3.9+-06b6d4.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-10b981.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-10b981.svg)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-7c3aed.svg)
 ![License](https://img.shields.io/badge/license-As--Is-f59e0b.svg)
 
