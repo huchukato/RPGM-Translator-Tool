@@ -645,7 +645,7 @@ class Translator:
         counter = 0
         def rep(m):
             nonlocal counter
-            k = f"\u27eaRNT{counter}\u27eb"; mapping[k] = m.group(0); counter += 1; return k
+            k = f"@@RNT{counter}@@"; mapping[k] = m.group(0); counter += 1; return k
         return self.RE_TOKEN.sub(rep, text), mapping
 
     def _restore(self, text: str, mapping: dict) -> str:
