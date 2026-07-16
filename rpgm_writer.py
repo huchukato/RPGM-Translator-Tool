@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import time
 from pathlib import Path
 from typing import Callable
 
@@ -18,53 +17,73 @@ class WriteError(RuntimeError):
     pass
 
 
+ORIGINAL_BACKUP_NAME = "data_bak_original"
+
+
+def _data_dir(root: Path) -> Path:
+    return root / "www" / "data" if (root / "www" / "data").is_dir() else root / "data"
+
+
+def _legacy_backups(data_dir: Path) -> list[Path]:
+    return sorted(
+        (path for path in data_dir.parent.glob("data_bak_*")
+         if path.is_dir() and path.name != ORIGINAL_BACKUP_NAME),
+        key=lambda path: path.stat().st_mtime,
+    )
+
+
+def _original_backup(root: Path) -> Path | None:
+    data_dir = _data_dir(root)
+    original = data_dir.parent / ORIGINAL_BACKUP_NAME
+    if original.is_dir():
+        return original
+    backups = _legacy_backups(data_dir)
+    if not backups:
+        return None
+    backups[0].rename(original)
+    for backup in backups[1:]:
+        shutil.rmtree(backup)
+    return original
+
+
 def find_orphan_backups(root: Path) -> list[Path]:
-    """Trova backup orfani in www/data_bak_* e li restituisce ordinati per età."""
-    data_dir = root / "www" / "data" if (root / "www" / "data").is_dir() else root / "data"
-    orphans: list[Path] = []
-    for cand in data_dir.parent.iterdir():
-        if cand.is_dir() and cand.name.startswith("data_bak_"):
-            orphans.append(cand)
-    return sorted(orphans, key=lambda p: p.stat().st_mtime)
+    data_dir = _data_dir(root)
+    return _legacy_backups(data_dir)
 
 
 def restore_oldest_backup(root: Path) -> Path | None:
-    """Ripristina il backup più vecchio se presente."""
-    orphans = find_orphan_backups(root)
-    if not orphans:
+    original = _original_backup(root)
+    if original is None:
         return None
-    oldest = orphans[0]
-    data_dir = root / "www" / "data" if (root / "www" / "data").is_dir() else root / "data"
+    data_dir = _data_dir(root)
     if data_dir.exists():
         shutil.rmtree(data_dir)
-    shutil.copytree(oldest, data_dir)
-    return oldest
+    shutil.copytree(original, data_dir)
+    return original
 
 
 def backup_data_dir(root: Path) -> Path:
-    """Crea un backup timestamped della cartella data."""
-    data_dir = root / "www" / "data" if (root / "www" / "data").is_dir() else root / "data"
+    data_dir = _data_dir(root)
     if not data_dir.is_dir():
         raise WriteError("Cartella dati non trovata per il backup.")
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    bak_dir = data_dir.parent / f"data_bak_{timestamp}"
-    shutil.copytree(data_dir, bak_dir)
-    return bak_dir
+    original = _original_backup(root)
+    if original is None:
+        original = data_dir.parent / ORIGINAL_BACKUP_NAME
+        shutil.copytree(data_dir, original)
+    return original
 
 
 def restore_data_backup(root: Path) -> Path:
-    """Ripristina la cartella data dall'ultimo backup disponibile."""
-    data_dir = root / "www" / "data" if (root / "www" / "data").is_dir() else root / "data"
+    data_dir = _data_dir(root)
     if not data_dir.parent.is_dir():
         raise WriteError("Cartella dati non trovata.")
-    backups = sorted(data_dir.parent.glob("data_bak_*"), reverse=True)
-    if not backups:
-        raise WriteError("Nessun backup trovato.")
-    latest = backups[0]
+    original = _original_backup(root)
+    if original is None:
+        raise WriteError("Nessun backup originale trovato.")
     if data_dir.exists():
         shutil.rmtree(data_dir)
-    shutil.copytree(latest, data_dir)
-    return latest
+    shutil.copytree(original, data_dir)
+    return original
 
 
 def load_local_cache(root: Path, cfg_key: str) -> dict[str, str]:

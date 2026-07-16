@@ -90,9 +90,9 @@ UI_TEXTS = {
         "clear_cache_done": "Cache cleared: {0} file(s) removed.",
         "restore_backup": "Restore Backup",
         "restore_backup_title": "Restore Backup",
-        "restore_backup_confirm": "Restore data from the latest backup? This will overwrite the current data folder.",
-        "restore_backup_done": "Data restored from {0}",
-        "restore_backup_none": "No backup found.",
+        "restore_backup_confirm": "Restore data from the original backup? This will overwrite the current data folder.",
+        "restore_backup_done": "Data restored from original backup {0}",
+        "restore_backup_none": "No original backup found.",
     },
     "it": {
         "title": "RPGM Translator",
@@ -158,9 +158,9 @@ UI_TEXTS = {
         "clear_cache_done": "Cache cancellata: {0} file rimossi.",
         "restore_backup": "Ripristina Backup",
         "restore_backup_title": "Ripristina Backup",
-        "restore_backup_confirm": "Ripristinare la cartella data dall'ultimo backup? Questo sovrascriverà i dati attuali.",
-        "restore_backup_done": "Data ripristinato da {0}",
-        "restore_backup_none": "Nessun backup trovato.",
+        "restore_backup_confirm": "Ripristinare la cartella data dal backup originale? Questo sovrascriverà i dati attuali.",
+        "restore_backup_done": "Data ripristinato dal backup originale {0}",
+        "restore_backup_none": "Nessun backup originale trovato.",
     },
 }
 
