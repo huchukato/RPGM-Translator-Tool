@@ -30,6 +30,8 @@ Inspired by the logic of **Ren'Py Translator** and the interface style of **WTFo
 
 ## 🆕 Latest
 
+- **Improved cache reuse** — cache now works across different translation backends and after re-analyzing translated games.
+- **Clean GUI display** — script tokens are hidden in the translation table and editor for better readability.
 - **String search** — filter the table live by original text, translated text, or both.
 - **Restore Backup** — restore the game from the single original `data_bak_original` backup.
 - **Safe script dialogue translation** — preserves dialogue prefixes, placeholders, asset identifiers, and plugin command internals while translating visible text.

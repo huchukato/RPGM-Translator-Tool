@@ -30,6 +30,8 @@ Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di *
 
 ## 🆕 Novità
 
+- **Riutilizzo cache migliorato** — la cache ora funziona tra diversi backend di traduzione e dopo aver ri-analizzato giochi già tradotti.
+- **Visualizzazione GUI pulita** — i token script sono nascosti nella tabella di traduzione e nell'editor per una migliore leggibilità.
 - **Ricerca stringhe** — filtra la tabella in tempo reale per testo originale, traduzione o entrambi.
 - **Ripristina Backup** — ripristina il gioco dall'unico backup originale `data_bak_original`.
 - **Traduzione sicura dei dialoghi script** — conserva prefissi dei dialoghi, placeholder, identificatori degli asset e parti interne dei comandi plugin mentre traduce il testo visibile.
