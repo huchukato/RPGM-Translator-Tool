@@ -204,8 +204,29 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             clean_text=clean,
         ))
 
+    def _is_script_literal_translatable(literal: str) -> bool:
+        """Controlla se una stringa letterale in uno script va tradotta.
+
+        Accetta sia frasi con spazi che singole parole, ma evita identificatori
+        tecnici del tipo GUI-MAP-Outskirts (nessuno spazio, trattini e maiuscole)
+        e stringhe con graffe/tilde non bilanciate che sembrano codice.
+        """
+        if not is_translatable_text(literal):
+            return False
+        if " " not in literal:
+            # Identificatori come GUI-MAP-Outskirts: trattini e maiuscole
+            if "-" in literal and re.search(r"[A-Z]", literal):
+                return False
+        # Se la stringa contiene graffe non bilanciate o un carattere di code injection,
+        # probabilmente è codice o placeholder, non testo visibile.
+        if literal.count("{") != literal.count("}"):
+            return False
+        if ">" in literal or "<" in literal:
+            return False
+        return True
+
     def add_script_text(script: str, keys: list[str | int]) -> bool:
-        """Estrae stringhe letterali traducibili da un comando Script (code 355/655)."""
+        """Estrae stringhe letterali traducibili da un comando Script (code 355/655/122/357)."""
         str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
         literals: list[str] = []
         code_segments: list[str] = []
@@ -214,7 +235,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         for m in str_re.finditer(script):
             current_code += script[prev_end:m.start()]
             literal = m.group(1)
-            if " " in literal and is_translatable_text(literal):
+            if _is_script_literal_translatable(literal):
                 code_segments.append(current_code + '"')
                 literals.append(literal)
                 current_code = ""
@@ -308,6 +329,29 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                         return
                     if val.startswith("テキスト-"):
                         add_text(val[5:], "inline_script", keys)
+                        return
+                if code == 122 and pi == 4:
+                    # Control Variables con operando script/stringa
+                    # Non usare fallback generico per evitare identificatori
+                    add_script_text(val, keys)
+                    return
+                if code in (357, 356):
+                    # Plugin Command: può contenere stringhe letterali o testo puro
+                    if add_script_text(val, keys):
+                        return
+                    if is_translatable_text(val):
+                        add_text(val, "plugin_command", keys)
+                        return
+                if code in (402, 408):
+                    if is_translatable_text(val):
+                        add_text(val, "event_param", keys)
+                        return
+                # Fallback generico per altri comandi evento che contengono
+                # parametri stringa traducibili (es. plugin personalizzati).
+                # Esplicitamente esclusi code 122/355/655/357/356/401/405/101/102/320/324.
+                if code not in (122, 355, 655, 357, 356, 401, 405, 101, 102, 320, 324, 402, 408):
+                    if is_translatable_text(val):
+                        add_text(val, "event_param", keys)
                         return
         # Sezione terms
         if any(k == "terms" for k in keys):
