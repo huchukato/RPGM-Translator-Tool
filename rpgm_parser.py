@@ -217,6 +217,9 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             # Identificatori come GUI-MAP-Outskirts: trattini e maiuscole
             if "-" in literal and re.search(r"[A-Z]", literal):
                 return False
+            # Identificatori camelCase come PoliceA, PoliceB
+            if re.search(r"[a-z][A-Z]", literal):
+                return False
             # Espressioni tipo Math.random() o www.example.com: punto senza spazi
             if "." in literal:
                 return False
