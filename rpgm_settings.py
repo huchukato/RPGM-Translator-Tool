@@ -88,6 +88,11 @@ UI_TEXTS = {
         "clear_cache_title": "Clear cache",
         "clear_cache_confirm": "This will delete the global translation cache and the local cache for the selected game. This cannot be undone. Proceed?",
         "clear_cache_done": "Cache cleared: {0} file(s) removed.",
+        "restore_backup": "Restore Backup",
+        "restore_backup_title": "Restore Backup",
+        "restore_backup_confirm": "Restore data from the latest backup? This will overwrite the current data folder.",
+        "restore_backup_done": "Data restored from {0}",
+        "restore_backup_none": "No backup found.",
     },
     "it": {
         "title": "RPGM Translator",
@@ -151,6 +156,11 @@ UI_TEXTS = {
         "clear_cache_title": "Cancella cache",
         "clear_cache_confirm": "Verranno cancellate la cache globale e quella locale del gioco selezionato. Non è annullabile. Procedere?",
         "clear_cache_done": "Cache cancellata: {0} file rimossi.",
+        "restore_backup": "Ripristina Backup",
+        "restore_backup_title": "Ripristina Backup",
+        "restore_backup_confirm": "Ripristinare la cartella data dall'ultimo backup? Questo sovrascriverà i dati attuali.",
+        "restore_backup_done": "Data ripristinato da {0}",
+        "restore_backup_none": "Nessun backup trovato.",
     },
 }
 

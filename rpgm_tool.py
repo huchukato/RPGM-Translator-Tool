@@ -28,7 +28,7 @@ from rpgm_settings import (
 )
 from rpgm_translator import OPENROUTER_FREE_MODELS, Translator, TranslatorConfig, TranslationError
 from rpgm_writer import (
-    WriteError, backup_data_dir, export_patch, load_local_cache, patch_data_files, save_local_cache,
+    WriteError, backup_data_dir, export_patch, load_local_cache, patch_data_files, restore_data_backup, save_local_cache,
 )
 
 ctk.set_appearance_mode("dark")
@@ -236,6 +236,12 @@ class RPGMTranslatorApp(ctk.CTk):
                                         fg_color=COLOR_ACCENT_MAGENTA, width=110, command=self._export_patch)
         self.btn_export.pack(side="left", padx=6, pady=10)
         self.btn_export.configure(state="disabled")
+
+        self.btn_restore_backup = ctk.CTkButton(bottom, text=t(self.current_lang, "restore_backup"),
+                                                fg_color=COLOR_BTN_WARN, hover_color="#b45309",
+                                                width=120, command=self._restore_backup)
+        self.btn_restore_backup.pack(side="left", padx=6, pady=10)
+        self.btn_restore_backup.configure(state="disabled")
 
         self.btn_forge = ctk.CTkButton(bottom, text=t(self.current_lang, "install_forge"),
                                        fg_color=COLOR_ACCENT_GOLD, width=140, command=self._install_forge)
@@ -493,6 +499,7 @@ class RPGMTranslatorApp(ctk.CTk):
                                    text_color=COLOR_BTN_MAIN)
         self.btn_translate.configure(state="normal")
         self.btn_forge.configure(state="normal")
+        self.btn_restore_backup.configure(state="normal")
         self.btn_save.configure(state="disabled")
         self.btn_export.configure(state="disabled")
         self._render_table([])
@@ -521,6 +528,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_save.configure(state="disabled")
         self.btn_export.configure(state="disabled")
         self.btn_forge.configure(state="disabled")
+        self.btn_restore_backup.configure(state="disabled")
         self.progress.set(0)
 
     def _on_work_done(self):
@@ -528,6 +536,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_cancel.configure(state="disabled")
         if self.game_path:
             self.btn_forge.configure(state="normal")
+            self.btn_restore_backup.configure(state="normal")
         if self.items and self.game_path:
             self.btn_save.configure(state="normal")
             self.btn_export.configure(state="normal")
@@ -790,6 +799,30 @@ class RPGMTranslatorApp(ctk.CTk):
         msg = self._t("clear_cache_done", removed)
         self.log(msg)
         messagebox.showinfo(self._t("clear_cache_title"), msg)
+
+    def _restore_backup(self):
+        if not self.game_path:
+            messagebox.showerror(self._t("error"), self._t("select_game_first"))
+            return
+        if not messagebox.askyesno(self._t("restore_backup_title"), self._t("restore_backup_confirm")):
+            return
+        try:
+            info = detect_engine(self.game_path)
+            root = info["root"]
+            restored = restore_data_backup(root)
+            self.extractor = None
+            self.items = []
+            self.filtered = []
+            self._analysis_done = False
+            self._render_table([])
+            msg = self._t("restore_backup_done", restored.name)
+            self.log(msg)
+            messagebox.showinfo(self._t("restore_backup_title"), msg)
+        except WriteError as e:
+            self.log(str(e))
+            messagebox.showinfo(self._t("restore_backup_title"), str(e))
+        except Exception as e:
+            self._handle_error(e)
 
     def _toggle_lang(self):
         self.current_lang = "it" if self.current_lang == "en" else "en"

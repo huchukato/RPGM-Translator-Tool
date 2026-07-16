@@ -52,6 +52,21 @@ def backup_data_dir(root: Path) -> Path:
     return bak_dir
 
 
+def restore_data_backup(root: Path) -> Path:
+    """Ripristina la cartella data dall'ultimo backup disponibile."""
+    data_dir = root / "www" / "data" if (root / "www" / "data").is_dir() else root / "data"
+    if not data_dir.parent.is_dir():
+        raise WriteError("Cartella dati non trovata.")
+    backups = sorted(data_dir.parent.glob("data_bak_*"), reverse=True)
+    if not backups:
+        raise WriteError("Nessun backup trovato.")
+    latest = backups[0]
+    if data_dir.exists():
+        shutil.rmtree(data_dir)
+    shutil.copytree(latest, data_dir)
+    return latest
+
+
 def load_local_cache(root: Path, cfg_key: str) -> dict[str, str]:
     cache_file = root / "trans_cache.json"
     if not cache_file.exists():
