@@ -26,7 +26,13 @@ Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di *
 - 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte).
 - 💾 Patch in-place con backup automatico dei dati.
 - 🗂️ Cache globale e locale delle traduzioni.
-- 📦 Esportazione delle traduzioni come patch.
+- 📦 Esportazione di `www/data` e `www/img/titles2` tradotte come patch.
+
+## 🆕 Novità
+
+- Pulsante **Cancella cache** — cancella le cache globali e locali dalla GUI.
+- **Traduzione stringhe dentro script** — traduce le stringhe letterali dentro i comandi JavaScript degli eventi (es. i tips dell’Oracolo in `CommonEvents.json`).
+- **Splash screen personalizzato** — metti `Splash_0.png` in `www/img/titles2/` e verrà incluso nella patch esportata.
 
 ## 📋 Requisiti
 
@@ -52,7 +58,7 @@ python3 rpgm_tool.py
 2. 🧠 **Analizza & Traduci** — Estrai e traduci automaticamente tutte le stringhe.
 3. ✏️ **Modifica** — Revisiona o modifica ogni stringa direttamente nella tabella.
 4. 💾 **Salva** — Applica le traduzioni ai file del gioco (il backup viene creato automaticamente).
-5. 📦 **Esporta** — Opzionalmente esporta la `www/data` tradotta come patch.
+5. 📦 **Esporta** — Opzionalmente esporta la `www/data` e `www/img/titles2` tradotte come patch.
 
 ## 🛡️ Backup
 

@@ -257,7 +257,7 @@ def export_patch(
     dest: Path,
     lang_code: str,
 ) -> Path:
-    """Copia la cartella www/data tradotta in una patch pronta per la distribuzione."""
+    """Copia la cartella www/data tradotta e il titolo/splash in una patch pronta per la distribuzione."""
     data_dir = root / "www" / "data" if (root / "www" / "data").is_dir() else root / "data"
     if not data_dir.is_dir():
         raise WriteError("Cartella dati non trovata per l'esportazione.")
@@ -265,4 +265,12 @@ def export_patch(
     if patch_dir.exists():
         shutil.rmtree(patch_dir)
     shutil.copytree(data_dir, patch_dir)
+    # Copia anche la cartella dello splash screen se presente
+    www_dir = data_dir.parent
+    titles2_src = www_dir / "img" / "titles2"
+    if titles2_src.is_dir():
+        titles2_dst = patch_dir.parent / "img" / "titles2"
+        if titles2_dst.exists():
+            shutil.rmtree(titles2_dst)
+        shutil.copytree(titles2_src, titles2_dst)
     return patch_dir.parent.parent

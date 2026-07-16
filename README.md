@@ -26,7 +26,13 @@ Inspired by the logic of **Ren'Py Translator** and the interface style of **WTFo
 - 🔎 Editable translation table with filters (All / Translated / Untranslated).
 - 💾 In-place patching with automatic `data` backup.
 - 🗂️ Global and local translation cache.
-- 📦 Export translated files as a patch.
+- 📦 Export translated `www/data` and `www/img/titles2` as a patch.
+
+## 🆕 Latest
+
+- **Clear cache** button — wipe global and local translation caches from the GUI.
+- **Script literal translation** — translates translatable strings inside JavaScript event commands (e.g., Oracle tips in `CommonEvents.json`).
+- **Custom splash screen** — place `Splash_0.png` in `www/img/titles2/` and it will be included in the exported patch.
 
 ## 📋 Requirements
 
@@ -52,7 +58,7 @@ python3 rpgm_tool.py
 2. 🧠 **Analyze & Translate** — Extract and translate all strings automatically.
 3. ✏️ **Edit** — Review or edit any string directly in the table.
 4. 💾 **Save** — Patch the game files (a backup is created automatically).
-5. 📦 **Export** — Optionally export the translated `www/data` as a patch.
+5. 📦 **Export** — Optionally export the translated `www/data` and `www/img/titles2` as a patch.
 
 ## 🛡️ Backup
 

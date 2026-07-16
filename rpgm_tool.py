@@ -709,6 +709,14 @@ class RPGMTranslatorApp(ctk.CTk):
             dst_data = tmp_root / src_data.relative_to(src_root)
             dst_data.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src_data, dst_data)
+            # Copia anche lo splash screen nella patch temporanea
+            titles2_src = src_data.parent / "img" / "titles2"
+            if titles2_src.is_dir():
+                titles2_dst = dst_data.parent / "img" / "titles2"
+                titles2_dst.parent.mkdir(parents=True, exist_ok=True)
+                if titles2_dst.exists():
+                    shutil.rmtree(titles2_dst)
+                shutil.copytree(titles2_src, titles2_dst)
             patch_data_files(tmp_root, self.items)
             self.root_after(lambda: self._set_progress(0.7, self._t("progress_exporting")))
             export_dir = export_patch(tmp_root, dest, lang_code)

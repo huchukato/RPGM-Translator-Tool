@@ -23,3 +23,9 @@ test_game/
 test_export/
 *.log
 trans_cache.json
+RELEASE_NOTES_v1.0.0.md
+F95.md
+
+# Build / lock files
+build.sh
+uv.lock
