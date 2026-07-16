@@ -21,17 +21,18 @@ Inspired by the logic of **Ren'Py Translator** and the interface style of **WTFo
   - 🔁 `CommonEvents.json`
   - ⚙️ `System.json` (game title, terms, labels)
   - 🛡️ `Items.json`, `Weapons.json`, `Armors.json`, `Skills.json`, `States.json`, `Enemies.json`, `Actors.json`, `Classes.json`
-  - 🔌 `js/plugins.js` (translatable plugin parameters)
+  - 🔌 `js/plugins.js` (translatable plugin text)
 - 🌍 Translation backends: **Google Turbo**, **Bing Ultra**, **OpenRouter**, **Llama local**.
-- 🔎 Editable translation table with filters (All / Translated / Untranslated).
-- 💾 In-place patching with automatic `data` backup.
-- 🗂️ Global and local translation cache.
+- 🔎 Editable translation table with filters (All / Translated / Untranslated) and live search by original text, translation, or both.
+- 💾 In-place patching with one protected original `data` backup.
+- 🗂️ Global and local translation cache, with a one-click cleanup option.
 - 📦 Export translated `www/data` as a patch.
 
 ## 🆕 Latest
 
-- **Clear cache** button — wipe global and local translation caches from the GUI.
-- **Script literal translation** — translates translatable strings inside JavaScript event commands (e.g., Oracle tips in `CommonEvents.json`).
+- **String search** — filter the table live by original text, translated text, or both.
+- **Restore Backup** — restore the game from the single original `data_bak_original` backup.
+- **Safe script dialogue translation** — preserves dialogue prefixes, placeholders, asset identifiers, and plugin command internals while translating visible text.
 
 ## 📋 Requirements
 
@@ -56,12 +57,13 @@ python3 rpgm_tool.py
 1. 🎮 **Select Game** — Click `.app` (macOS) or `Folder` and choose the game directory.
 2. 🧠 **Analyze & Translate** — Extract and translate all strings automatically.
 3. ✏️ **Edit** — Review or edit any string directly in the table.
-4. 💾 **Save** — Patch the game files (a backup is created automatically).
+4. 💾 **Save** — Patch the game files (the original backup is created only once).
 5. 📦 **Export** — Optionally export the translated `www/data` as a patch.
+6. ♻️ **Start over** — Use **Restore Backup**, then **Clear cache**, before analyzing and translating again.
 
 ## 🛡️ Backup
 
-Before patching, the tool backs up `www/data` to `www/data_bak_<timestamp>`.
+Before the first patch, the tool creates `www/data_bak_original`. This is the only backup kept, and **Restore Backup** always restores from it.
 
 ## 🙏 Credits
 

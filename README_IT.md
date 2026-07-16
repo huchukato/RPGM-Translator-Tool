@@ -21,17 +21,18 @@ Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di *
   - 🔁 `CommonEvents.json`
   - ⚙️ `System.json` (titolo del gioco, termini, etichette)
   - 🛡️ `Items.json`, `Weapons.json`, `Armors.json`, `Skills.json`, `States.json`, `Enemies.json`, `Actors.json`, `Classes.json`
-  - 🔌 `js/plugins.js` (parametri testuali dei plugin)
+  - 🔌 `js/plugins.js` (testo traducibile dei plugin)
 - 🌍 Backend di traduzione: **Google Turbo**, **Bing Ultra**, **OpenRouter**, **Llama locale**.
-- 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte).
-- 💾 Patch in-place con backup automatico dei dati.
-- 🗂️ Cache globale e locale delle traduzioni.
+- 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte) e ricerca live per originale, traduzione o entrambi.
+- 💾 Patch in-place con un unico backup originale protetto di `data`.
+- 🗂️ Cache globale e locale delle traduzioni, cancellabile dalla GUI.
 - 📦 Esportazione di `www/data` tradotte come patch.
 
 ## 🆕 Novità
 
-- Pulsante **Cancella cache** — cancella le cache globali e locali dalla GUI.
-- **Traduzione stringhe dentro script** — traduce le stringhe letterali dentro i comandi JavaScript degli eventi (es. i tips dell’Oracolo in `CommonEvents.json`).
+- **Ricerca stringhe** — filtra la tabella in tempo reale per testo originale, traduzione o entrambi.
+- **Ripristina Backup** — ripristina il gioco dall'unico backup originale `data_bak_original`.
+- **Traduzione sicura dei dialoghi script** — conserva prefissi dei dialoghi, placeholder, identificatori degli asset e parti interne dei comandi plugin mentre traduce il testo visibile.
 
 ## 📋 Requisiti
 
@@ -56,12 +57,13 @@ python3 rpgm_tool.py
 1. 🎮 **Seleziona Gioco** — Clicca `.app` (macOS) o `Cartella` e scegli la cartella del gioco.
 2. 🧠 **Analizza & Traduci** — Estrai e traduci automaticamente tutte le stringhe.
 3. ✏️ **Modifica** — Revisiona o modifica ogni stringa direttamente nella tabella.
-4. 💾 **Salva** — Applica le traduzioni ai file del gioco (il backup viene creato automaticamente).
+4. 💾 **Salva** — Applica le traduzioni ai file del gioco (il backup originale viene creato una sola volta).
 5. 📦 **Esporta** — Opzionalmente esporta la `www/data` tradotte come patch.
+6. ♻️ **Ricomincia** — Usa **Ripristina Backup**, poi **Cancella cache**, prima di analizzare e tradurre di nuovo.
 
 ## 🛡️ Backup
 
-Prima della patch, lo strumento salva un backup di `www/data` in `www/data_bak_<timestamp>`.
+Prima della prima patch, lo strumento crea `www/data_bak_original`. È l'unico backup mantenuto e **Ripristina Backup** usa sempre questa copia.
 
 ## 🙏 Crediti
 
