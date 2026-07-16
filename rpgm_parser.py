@@ -150,7 +150,7 @@ def is_translatable_text(clean: str) -> bool:
     if " " not in s:
         if re.search(r"[a-zA-Z]", s) and re.search(r"[0-9]", s):
             return False
-        if any(c in s for c in "_./\\"):
+        if any(c in s for c in "_/\\") or "." in s.rstrip(".!?…"):
             return False
         if re.match(r"^[a-z]+[A-Z]", s):
             return False
@@ -221,7 +221,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             if re.search(r"[a-z][A-Z]", literal):
                 return False
             # Espressioni tipo Math.random() o www.example.com: punto senza spazi
-            if "." in literal:
+            if "." in literal.rstrip(".!?…"):
                 return False
         # Se la stringa contiene graffe non bilanciate o simboli chiaramente di codice,
         # probabilmente è codice o placeholder, non testo visibile.
@@ -234,7 +234,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
     def add_script_text(script: str, keys: list[str | int]) -> bool:
         """Estrae stringhe letterali traducibili da un comando Script (code 355/655/122/357)."""
         str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
-        dialogue_prefix_re = re.compile(r"^([A-Za-z][A-Za-z0-9#^>]*\.)")
+        dialogue_prefix_re = re.compile(r"^([A-Za-z][A-Za-z0-9#^>{}]*\.)")
         literals: list[str] = []
         code_segments: list[str] = []
         current_code = ""
@@ -243,7 +243,8 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             current_code += script[prev_end:m.start()]
             literal = m.group(1)
             prefix_match = dialogue_prefix_re.match(literal)
-            prefix = prefix_match.group(1) if prefix_match else ""
+            candidate = literal[prefix_match.end():] if prefix_match else ""
+            prefix = prefix_match.group(1) if prefix_match and (" " in candidate or candidate.endswith((".", "!", "?", "…"))) else ""
             translatable = literal[len(prefix):]
             if _is_script_literal_translatable(translatable):
                 code_segments.append(current_code + '"' + prefix)
