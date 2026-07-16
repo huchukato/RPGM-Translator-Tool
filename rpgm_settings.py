@@ -157,7 +157,6 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "backend": "bing_ultra",
     "translation_profile": "Balanced",
     "preserve_names": False,
-    "last_game_dir": str(Path.home() / "Downloads"),
     "openrouter_api_key": "",
     "openrouter_model": "google/gemma-2-9b-it:free",
     "llama_model_repo": "llmfan46/gemma-4-E4B-it-ultra-uncensored-heretic-GGUF",

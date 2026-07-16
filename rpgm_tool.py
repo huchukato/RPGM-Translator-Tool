@@ -458,13 +458,13 @@ class RPGMTranslatorApp(ctk.CTk):
     # ─── Game Selection ──────────────────────────────────────────────────
 
     def _pick_app(self):
-        initialdir = self.settings.get("last_game_dir", str(Path.home() / "Downloads"))
+        initialdir = str(Path.home() / "Downloads")
         path = filedialog.askopenfilename(title=self._t("select_app"), initialdir=initialdir)
         if path:
             self._set_game(Path(path))
 
     def _pick_folder(self):
-        initialdir = self.settings.get("last_game_dir", str(Path.home() / "Downloads"))
+        initialdir = str(Path.home() / "Downloads")
         path = filedialog.askdirectory(title=self._t("select_folder"), initialdir=initialdir)
         if path:
             self._set_game(Path(path))
@@ -480,8 +480,6 @@ class RPGMTranslatorApp(ctk.CTk):
         self.items = []
         self.filtered = []
         self._analysis_done = False
-        self.settings["last_game_path"] = str(path)
-        self.settings["last_game_dir"] = str(path if path.is_dir() else path.parent)
         self._save_settings()
         self.path_entry.delete(0, tk.END)
         self.path_entry.insert(0, str(path))
@@ -709,14 +707,6 @@ class RPGMTranslatorApp(ctk.CTk):
             dst_data = tmp_root / src_data.relative_to(src_root)
             dst_data.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src_data, dst_data)
-            # Copia anche lo splash screen nella patch temporanea
-            titles2_src = src_data.parent / "img" / "titles2"
-            if titles2_src.is_dir():
-                titles2_dst = dst_data.parent / "img" / "titles2"
-                titles2_dst.parent.mkdir(parents=True, exist_ok=True)
-                if titles2_dst.exists():
-                    shutil.rmtree(titles2_dst)
-                shutil.copytree(titles2_src, titles2_dst)
             patch_data_files(tmp_root, self.items)
             self.root_after(lambda: self._set_progress(0.7, self._t("progress_exporting")))
             export_dir = export_patch(tmp_root, dest, lang_code)
@@ -798,11 +788,7 @@ class RPGMTranslatorApp(ctk.CTk):
         save_settings(self.settings)
 
     def _restore_last_game(self):
-        last = self.settings.get("last_game_path")
-        if last:
-            p = Path(last)
-            if p.exists():
-                self._set_game(p)
+        pass
 
     # ─── Error handling ───────────────────────────────────────────────────
 
