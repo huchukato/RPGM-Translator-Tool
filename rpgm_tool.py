@@ -222,6 +222,11 @@ class RPGMTranslatorApp(ctk.CTk):
                                            width=180, command=self._analyze_translate)
         self.btn_translate.pack(side="left", padx=10, pady=10)
 
+        self.btn_cancel = ctk.CTkButton(bottom, text=t(self.current_lang, "cancel"),
+                                        fg_color=COLOR_BTN_WARN, hover_color="#b45309",
+                                        width=100, command=self._cancel, state="disabled")
+        self.btn_cancel.pack(side="left", padx=6, pady=10)
+
         self.btn_save = ctk.CTkButton(bottom, text=t(self.current_lang, "save"),
                                       fg_color=COLOR_ACCENT, width=110, command=self._save_translation)
         self.btn_save.pack(side="left", padx=6, pady=10)
@@ -512,6 +517,7 @@ class RPGMTranslatorApp(ctk.CTk):
 
     def _reset_ui_for_work(self):
         self.btn_translate.configure(state="disabled")
+        self.btn_cancel.configure(state="normal")
         self.btn_save.configure(state="disabled")
         self.btn_export.configure(state="disabled")
         self.btn_forge.configure(state="disabled")
@@ -519,6 +525,7 @@ class RPGMTranslatorApp(ctk.CTk):
 
     def _on_work_done(self):
         self.btn_translate.configure(state="normal")
+        self.btn_cancel.configure(state="disabled")
         if self.game_path:
             self.btn_forge.configure(state="normal")
         if self.items and self.game_path:
@@ -527,8 +534,12 @@ class RPGMTranslatorApp(ctk.CTk):
         self._apply_filter()
 
     def _cancel(self):
+        self.btn_cancel.configure(state="disabled")
         if self.translator:
             self.translator.cancel()
+            self.log("Cancelling translation...")
+        else:
+            self.log("No translation in progress to cancel.")
 
     def _install_forge(self):
         if not self.game_path:
@@ -819,8 +830,12 @@ class RPGMTranslatorApp(ctk.CTk):
 
     def _handle_error(self, exc: Exception):
         err = str(exc)
-        self.log(f"Error: {err}")
-        self.root_after(lambda: messagebox.showerror(self._t("error"), err))
+        if self.translator and self.translator.cancelled:
+            self.log(self._t("translation_cancelled"))
+            self.root_after(lambda: self._set_progress(0.0, self._t("translation_cancelled")))
+        else:
+            self.log(f"Error: {err}")
+            self.root_after(lambda: messagebox.showerror(self._t("error"), err))
         self.root_after(self._on_work_done)
 
 
