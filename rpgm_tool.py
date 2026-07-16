@@ -752,6 +752,7 @@ class RPGMTranslatorApp(ctk.CTk):
             self.root_after(lambda: self._set_progress(1.0, msg))
             self.root_after(self._on_work_done)
             self.root_after(lambda: self.btn_export.configure(state="normal"))
+            self.root_after(lambda: messagebox.showinfo(self._t("save_complete_title"), msg))
         except Exception as e:
             self._handle_error(e)
 
