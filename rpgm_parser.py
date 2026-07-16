@@ -23,6 +23,7 @@ class ExtractedString:
     escape_parts: list[dict] = field(default_factory=list)
     clean_text: str = ""
     token_map: dict[str, str] = field(default_factory=dict)
+    has_script_tokens: bool = False
 
 
 # Campi testo riconosciuti nei JSON data
@@ -113,6 +114,23 @@ def restore_escape_codes(translated: str, parts: list[dict]) -> str:
             result = result[:idx] + code + result[idx:]
         else:
             result += code
+    return result
+
+
+def strip_script_tokens(text: str) -> str:
+    """Rimuove i token RJS dal testo per la visualizzazione nella GUI."""
+    if not text:
+        return text
+    return re.sub(r"@@RJS\d+@@", "", text)
+
+
+def restore_script_tokens(text: str, token_map: dict[str, str]) -> str:
+    """Reinserisce i token RJS nel testo per il salvataggio."""
+    if not token_map:
+        return text
+    result = text
+    for ph, code in token_map.items():
+        result = result.replace(ph, code)
     return result
 
 
@@ -280,6 +298,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             escape_parts=[],
             clean_text=clean_text,
             token_map=token_map,
+            has_script_tokens=True,
         ))
         return True
 

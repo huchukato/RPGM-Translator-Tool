@@ -21,7 +21,7 @@ from tkinter import filedialog, messagebox
 from rpgm_detector import detect_engine, DetectionError
 from rpgm_extractor import RPGMExtractor
 from rpgm_forge import ensure_forge_js, install_forge
-from rpgm_parser import ExtractedString
+from rpgm_parser import ExtractedString, strip_script_tokens, restore_script_tokens
 from rpgm_settings import (
     BACKEND_LABELS, BACKENDS, DEFAULT_SETTINGS, LANGUAGES, SETTINGS_FILE,
     UI_TEXTS, load_settings, save_settings, t,
@@ -428,7 +428,7 @@ class RPGMTranslatorApp(ctk.CTk):
                 str(abs_i + 1),
                 item.kind,
                 item.text[:70],
-                (item.translated or "")[:70],
+                strip_script_tokens(item.translated or "")[:70],
                 item.file,
             ]
             for val, w in zip(vals, cols_w):
@@ -451,7 +451,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self._render_page()
         self.edit_text.configure(state="normal")
         self.edit_text.delete("1.0", "end")
-        self.edit_text.insert("end", item.translated if item.translated else "")
+        self.edit_text.insert("end", strip_script_tokens(item.translated if item.translated else ""))
         self.edit_text.configure(state="normal")
         self.btn_edit_save.configure(state="normal")
 
@@ -459,7 +459,12 @@ class RPGMTranslatorApp(ctk.CTk):
         if self._selected_index is None or self._selected_index >= len(self.filtered):
             return
         item = self.filtered[self._selected_index]
-        item.translated = self.edit_text.get("1.0", "end-1c")
+        edited_text = self.edit_text.get("1.0", "end-1c")
+        # Reinserisci i token se l'item ne ha
+        if item.has_script_tokens and item.token_map:
+            item.translated = restore_script_tokens(edited_text, item.token_map)
+        else:
+            item.translated = edited_text
         self._render_page()
         self.btn_save.configure(state="normal")
         self.btn_export.configure(state="disabled")
@@ -615,7 +620,7 @@ class RPGMTranslatorApp(ctk.CTk):
         if not self.extractor or not self.items:
             return
         cfg = self._make_config()
-        cfg_key = f"{cfg.source_lang}|{cfg.target_lang}|{cfg.backend}"
+        cfg_key = f"{cfg.source_lang}|{cfg.target_lang}"
         cached = load_local_cache(self.extractor.root, cfg_key)
         if not cached:
             return
@@ -632,7 +637,7 @@ class RPGMTranslatorApp(ctk.CTk):
         try:
             self.log(f"Starting analysis of: {self.game_path}")
             self.root_after(lambda: self._set_progress(0.1, self._t("progress_analyzing")))
-            self.extractor = RPGMExtractor(self.game_path)
+            self.extractor = RPGMExtractor(self.game_path, use_original=True)
             self.items = self.extractor.extract(
                 progress_cb=lambda c, t, msg: self.root_after(
                     lambda c=c, t=t: self._set_progress(0.1 + 0.2 * (c / max(t, 1)), msg)
@@ -667,7 +672,7 @@ class RPGMTranslatorApp(ctk.CTk):
             # Analyze
             self.log(f"Starting analysis & translation for: {self.game_path}")
             self.root_after(lambda: self._set_progress(0.05, self._t("progress_analyzing")))
-            self.extractor = RPGMExtractor(self.game_path)
+            self.extractor = RPGMExtractor(self.game_path, use_original=True)
             self.items = self.extractor.extract(
                 progress_cb=lambda c, t, msg: self.root_after(
                     lambda c=c, t=t: self._set_progress(0.05 + 0.45 * (c / max(t, 1)), msg)
@@ -759,7 +764,7 @@ class RPGMTranslatorApp(ctk.CTk):
         patched = patch_data_files(self.extractor.root, self.items)
         self.log(f"Patched {patched} strings.")
         cfg = self._make_config()
-        cfg_key = f"{cfg.source_lang}|{cfg.target_lang}|{cfg.backend}"
+        cfg_key = f"{cfg.source_lang}|{cfg.target_lang}"
         save_local_cache(self.extractor.root, cfg_key, self.items)
         self.log("Local cache saved.")
 
