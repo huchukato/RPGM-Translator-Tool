@@ -237,6 +237,11 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_forge.pack(side="left", padx=6, pady=10)
         self.btn_forge.configure(state="disabled")
 
+        self.btn_clear_cache = ctk.CTkButton(bottom, text=t(self.current_lang, "clear_cache"),
+                                             fg_color=COLOR_BTN_WARN, hover_color="#b45309",
+                                             width=100, command=self._clear_cache)
+        self.btn_clear_cache.pack(side="right", padx=6, pady=10)
+
         ctk.CTkButton(bottom, text=t(self.current_lang, "settings"), fg_color=COLOR_ACCENT,
                       width=100, command=self._open_settings).pack(side="right", padx=10, pady=10)
 
@@ -721,6 +726,36 @@ class RPGMTranslatorApp(ctk.CTk):
 
     def _open_settings(self):
         SettingsDialog(self)
+
+    def _clear_cache(self):
+        if not messagebox.askyesno(self._t("clear_cache_title"), self._t("clear_cache_confirm")):
+            return
+
+        removed = 0
+        # Global cache files
+        cache_dir = Path.home() / ".cache" / "rpgm-translator"
+        if cache_dir.exists():
+            for cache_file in cache_dir.glob("translation_cache_*.json"):
+                try:
+                    cache_file.unlink()
+                    removed += 1
+                except Exception as e:
+                    self.log(f"Could not delete {cache_file}: {e}")
+
+        # Local cache for selected game
+        if self.game_path:
+            try:
+                info = detect_engine(self.game_path)
+                local_cache = info["root"] / "trans_cache.json"
+                if local_cache.exists():
+                    local_cache.unlink()
+                    removed += 1
+            except Exception as e:
+                self.log(f"Could not detect local cache: {e}")
+
+        msg = self._t("clear_cache_done", removed)
+        self.log(msg)
+        messagebox.showinfo(self._t("clear_cache_title"), msg)
 
     def _toggle_lang(self):
         self.current_lang = "it" if self.current_lang == "en" else "en"

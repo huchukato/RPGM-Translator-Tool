@@ -83,6 +83,10 @@ UI_TEXTS = {
         "openrouter_model": "OpenRouter Model:",
         "llama_repo": "Llama model repo (HuggingFace):",
         "llama_file": "Llama model file (.gguf):",
+        "clear_cache": "Clear cache",
+        "clear_cache_title": "Clear cache",
+        "clear_cache_confirm": "This will delete the global translation cache and the local cache for the selected game. This cannot be undone. Proceed?",
+        "clear_cache_done": "Cache cleared: {0} file(s) removed.",
     },
     "it": {
         "title": "RPGM Translator",
@@ -141,6 +145,10 @@ UI_TEXTS = {
         "openrouter_model": "Modello OpenRouter:",
         "llama_repo": "Repo modello Llama (HuggingFace):",
         "llama_file": "File modello Llama (.gguf):",
+        "clear_cache": "Cancella cache",
+        "clear_cache_title": "Cancella cache",
+        "clear_cache_confirm": "Verranno cancellate la cache globale e quella locale del gioco selezionato. Non è annullabile. Procedere?",
+        "clear_cache_done": "Cache cancellata: {0} file rimossi.",
     },
 }
 
