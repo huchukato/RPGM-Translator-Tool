@@ -50,17 +50,23 @@ def detect_engine(game_path: Path) -> dict:
         # Selezionato un file eseguibile: prendiamo la cartella genitore
         root = game_path.parent
     elif game_path.suffix.lower() == ".app":
-        # macOS .app bundle: cercare Contents/Resources/autorun o simili
-        for sub in ("Contents/Resources/autorun", "Contents/Resources", "Contents/MacOS"):
+        # macOS .app bundle: cercare Contents/Resources/app.nw o altre posizioni comuni
+        for sub in ("Contents/Resources/app.nw", "Contents/Resources/autorun", "Contents/Resources", "Contents/MacOS"):
             cand = game_path / sub
             if cand.is_dir() and find_data_dir(cand):
                 root = cand
                 break
         else:
-            # fallback: cerca in tutta la .app
+            # fallback: cerca in tutta la .app, ignorando backup data_bak_*
             for cand in game_path.rglob("System.json"):
-                root = cand.parent.parent if cand.parent.name == "data" else cand.parent
-                break
+                if cand.parent.name.startswith("data_bak_"):
+                    continue
+                if cand.parent.name == "data":
+                    root = cand.parent.parent
+                else:
+                    root = cand.parent
+                if find_data_dir(root):
+                    break
 
     data_dir = find_data_dir(root)
     if not data_dir:
