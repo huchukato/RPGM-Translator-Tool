@@ -28,7 +28,7 @@ from rpgm_settings import (
 )
 from rpgm_translator import OPENROUTER_FREE_MODELS, Translator, TranslatorConfig, TranslationError
 from rpgm_writer import (
-    WriteError, backup_data_dir, export_patch, patch_data_files, save_local_cache,
+    WriteError, backup_data_dir, export_patch, load_local_cache, patch_data_files, save_local_cache,
 )
 
 ctk.set_appearance_mode("dark")
@@ -556,6 +556,23 @@ class RPGMTranslatorApp(ctk.CTk):
 
     # ─── Threads ─────────────────────────────────────────────────────────
 
+    def _apply_local_cache(self):
+        if not self.extractor or not self.items:
+            return
+        cfg = self._make_config()
+        cfg_key = f"{cfg.source_lang}|{cfg.target_lang}|{cfg.backend}"
+        cached = load_local_cache(self.extractor.root, cfg_key)
+        if not cached:
+            return
+        applied = 0
+        for item in self.items:
+            key = f"{item.file}:{'.'.join(str(k) for k in item.key_path)}:{item.text}"
+            if key in cached:
+                item.translated = cached[key]
+                applied += 1
+        if applied:
+            self.log(f"Loaded {applied} translations from local cache.")
+
     def _analyze_thread(self):
         try:
             self.log(f"Starting analysis of: {self.game_path}")
@@ -566,8 +583,12 @@ class RPGMTranslatorApp(ctk.CTk):
                     lambda c=c, t=t: self._set_progress(0.1 + 0.2 * (c / max(t, 1)), msg)
                 )
             )
+            self._apply_local_cache()
             self._analysis_done = True
+            translated_count = sum(1 for i in self.items if i.translated)
             msg = self._t("analysis_complete", len(self.items), self.extractor.files_count)
+            if translated_count:
+                msg += f" ({translated_count} from cache)"
             self.log(msg)
             self.root_after(lambda: self._set_progress(1.0, msg))
             self.root_after(self._on_work_done)
@@ -597,11 +618,15 @@ class RPGMTranslatorApp(ctk.CTk):
                     lambda c=c, t=t: self._set_progress(0.05 + 0.45 * (c / max(t, 1)), msg)
                 )
             )
+            self._apply_local_cache()
             self._analysis_done = True
+            cached_count = sum(1 for i in self.items if i.translated)
             self.log(self._t("analysis_complete", len(self.items), self.extractor.files_count))
+            if cached_count:
+                self.log(f"{cached_count} translations loaded from local cache.")
 
-            # Translate
-            self._do_translate(self.items, base_progress=0.5, range_progress=0.5)
+            # Translate only items still missing a translation
+            self._do_translate([i for i in self.items if not i.translated], base_progress=0.5, range_progress=0.5)
 
             self.root_after(lambda: self._set_progress(1.0, self._t("translation_complete",
                                                                    sum(1 for i in self.items if i.translated),
