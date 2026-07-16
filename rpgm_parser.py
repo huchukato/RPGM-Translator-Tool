@@ -234,6 +234,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
     def add_script_text(script: str, keys: list[str | int]) -> bool:
         """Estrae stringhe letterali traducibili da un comando Script (code 355/655/122/357)."""
         str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
+        dialogue_prefix_re = re.compile(r"^([A-Za-z][A-Za-z0-9#^>]*\.)")
         literals: list[str] = []
         code_segments: list[str] = []
         current_code = ""
@@ -241,9 +242,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         for m in str_re.finditer(script):
             current_code += script[prev_end:m.start()]
             literal = m.group(1)
-            if _is_script_literal_translatable(literal):
-                code_segments.append(current_code + '"')
-                literals.append(literal)
+            prefix_match = dialogue_prefix_re.match(literal)
+            prefix = prefix_match.group(1) if prefix_match else ""
+            translatable = literal[len(prefix):]
+            if _is_script_literal_translatable(translatable):
+                code_segments.append(current_code + '"' + prefix)
+                literals.append(translatable)
                 current_code = ""
                 prev_end = m.end() - 1  # include closing quote in the next code segment
             else:
