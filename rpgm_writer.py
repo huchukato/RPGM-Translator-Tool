@@ -143,8 +143,11 @@ def _patch_json_file(file_path: Path, file_trans: dict[str, ExtractedString]) ->
             current_val = obj[last_key]
         if isinstance(current_val, str):
             restored = restore_escape_codes(item.translated, item.escape_parts)
-            # Ricostruisce prefisso speciale per script inline
-            if len(keys) >= 2:
+            if item.token_map:
+                for ph, code in item.token_map.items():
+                    restored = restored.replace(ph, code)
+            # Ricostruisce prefisso speciale per script inline solo se originale lo aveva
+            if len(keys) >= 2 and not item.token_map:
                 parent = _get_value_at_path(data, keys[:-2])
                 if isinstance(parent, dict) and parent.get("code") in (355, 655):
                     restored = "テキスト-" + restored

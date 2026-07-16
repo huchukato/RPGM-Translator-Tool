@@ -22,6 +22,7 @@ class ExtractedString:
     translated: str = ""
     escape_parts: list[dict] = field(default_factory=list)
     clean_text: str = ""
+    token_map: dict[str, str] = field(default_factory=dict)
 
 
 # Campi testo riconosciuti nei JSON data
@@ -203,6 +204,53 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             clean_text=clean,
         ))
 
+    def add_script_text(script: str, keys: list[str | int]) -> bool:
+        """Estrae stringhe letterali traducibili da un comando Script (code 355/655)."""
+        str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
+        literals: list[str] = []
+        code_segments: list[str] = []
+        current_code = ""
+        prev_end = 0
+        for m in str_re.finditer(script):
+            current_code += script[prev_end:m.start()]
+            literal = m.group(1)
+            if " " in literal and is_translatable_text(literal):
+                code_segments.append(current_code + '"')
+                literals.append(literal)
+                current_code = ""
+                prev_end = m.end() - 1  # include closing quote in the next code segment
+            else:
+                current_code += m.group(0)
+                prev_end = m.end()
+        if not literals:
+            return False
+        current_code += script[prev_end:]
+        code_segments.append(current_code)
+
+        clean_text = ""
+        token_map: dict[str, str] = {}
+        for i, lit in enumerate(literals):
+            ph = f"@@RJS{i}@@"
+            clean_text += ph + lit
+            token_map[ph] = code_segments[i]
+        final_ph = f"@@RJS{len(literals)}@@"
+        clean_text += final_ph
+        token_map[final_ph] = code_segments[-1]
+
+        current_id = idx_ref[0]
+        idx_ref[0] += 1
+        texts.append(ExtractedString(
+            id=current_id,
+            kind="script_literal",
+            text=script,
+            file=file_name,
+            key_path=list(keys),
+            escape_parts=[],
+            clean_text=clean_text,
+            token_map=token_map,
+        ))
+        return True
+
     def check_string(val: str, keys: list[str | int]) -> None:
         key = keys[-1]
         if isinstance(key, str):
@@ -255,9 +303,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                 if code in (320, 324):
                     add_text(val, "actor_name", keys)
                     return
-                if code in (355, 655) and val.startswith("テキスト-"):
-                    add_text(val[5:], "inline_script", keys)
-                    return
+                if code in (355, 655):
+                    if add_script_text(val, keys):
+                        return
+                    if val.startswith("テキスト-"):
+                        add_text(val[5:], "inline_script", keys)
+                        return
         # Sezione terms
         if any(k == "terms" for k in keys):
             add_text(val, "term", keys)
