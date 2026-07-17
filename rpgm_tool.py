@@ -189,12 +189,6 @@ class RPGMTranslatorApp(ctk.CTk):
                                     value=val, command=self._apply_filter)
             rb.pack(side="left", padx=4)
 
-        # Select All checkbox
-        self.select_all_var = ctk.StringVar(value="off")
-        self.select_all_checkbox = ctk.CTkCheckBox(ctrl, text="Select All", variable=self.select_all_var,
-                                                   onvalue="on", offvalue="off", command=self._on_select_all)
-        self.select_all_checkbox.pack(side="left", padx=(20, 4))
-
         ctk.CTkLabel(ctrl, text="Source:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
         self.source_lang_var = ctk.StringVar(value=self.settings.get("source_lang", "Auto"))
         self.source_lang_combo = ctk.CTkComboBox(ctrl, values=["Auto"] + list(LANGUAGES.keys()), width=130,
@@ -277,12 +271,6 @@ class RPGMTranslatorApp(ctk.CTk):
                                                      text_color="white", width=130, command=self._clear_manual_edits)
         self.btn_clear_manual_edits.pack(side="right", padx=6, pady=10)
 
-        self.btn_delete_row = ctk.CTkButton(bottom, text="Delete Row",
-                                            fg_color="#dc2626", hover_color="#b91c1c",
-                                            text_color="white", width=100, command=self._delete_selected_row)
-        self.btn_delete_row.pack(side="right", padx=6, pady=10)
-        self.btn_delete_row.configure(state="disabled")
-
         ctk.CTkButton(bottom, text=t(self.current_lang, "settings"), fg_color=COLOR_ACCENT,
                       text_color="black", width=100, command=self._open_settings).pack(side="right", padx=10, pady=10)
 
@@ -337,6 +325,19 @@ class RPGMTranslatorApp(ctk.CTk):
         self.search_scope_combo = ctk.CTkComboBox(search_row, values=list(self._search_scopes), width=150,
                                                    variable=self.search_scope_var, command=self._on_search_scope_change)
         self.search_scope_combo.pack(side="left", padx=4, pady=4)
+
+        # Select All checkbox
+        self.select_all_var = ctk.StringVar(value="off")
+        self.select_all_checkbox = ctk.CTkCheckBox(search_row, text="Select All", variable=self.select_all_var,
+                                                   onvalue="on", offvalue="off", command=self._on_select_all)
+        self.select_all_checkbox.pack(side="left", padx=(8, 4), pady=4)
+
+        # Delete Row button
+        self.btn_delete_row = ctk.CTkButton(search_row, text="Delete Row",
+                                            fg_color="#dc2626", hover_color="#b91c1c",
+                                            text_color="white", width=100, command=self._delete_selected_row)
+        self.btn_delete_row.pack(side="left", padx=(4, 8), pady=4)
+        self.btn_delete_row.configure(state="disabled")
 
         # Header
         header = ctk.CTkFrame(table_outer, fg_color=COLOR_ACCENT, height=28)
