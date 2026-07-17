@@ -1,5 +1,5 @@
 [project]
-name = "rpgm-translator"
+name = "rpgm-translator-tool"
 version = "1.0.0"
 description = "RPGM-Translator - RPG Maker MV/MZ Game Translator"
 requires-python = ">=3.9"
