@@ -98,22 +98,31 @@ def extract_escape_codes(text: str) -> tuple[str, list[dict]]:
 
 
 def restore_escape_codes(translated: str, parts: list[dict]) -> str:
-    """Reinserisce gli escape code nella posizione logica originale."""
+    """Reinserisce gli escape code nella posizione logica originale usando percentuale."""
     # Corregge spazio tra % e numero che alcuni traduttori inseriscono
     result = re.sub(r"%\s+(\d+)", r"%\1", translated)
     if not parts:
         return result
     if all(p["idx"] == 0 for p in parts):
         return "".join(p["code"] for p in parts) + result
+    
+    # Calcola la lunghezza del testo originale pulito
+    original_length = max(p["idx"] for p in parts) if parts else 0
+    if original_length == 0:
+        original_length = 1
+    
     for p in reversed(parts):
-        idx = p["idx"]
+        original_idx = p["idx"]
         code = p["code"]
-        if idx == 0:
+        if original_idx == 0:
             result = code + result
-        elif idx <= len(result):
-            result = result[:idx] + code + result[idx:]
         else:
-            result += code
+            # Calcola la posizione percentuale e applica alla traduzione
+            percentage = original_idx / original_length
+            new_idx = int(percentage * len(result))
+            # Assicurati che la posizione sia valida
+            new_idx = max(0, min(new_idx, len(result)))
+            result = result[:new_idx] + code + result[new_idx:]
     return result
 
 
