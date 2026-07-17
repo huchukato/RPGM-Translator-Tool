@@ -27,3 +27,7 @@ trans_cache.json
 # Build / lock files
 build.sh
 uv.lock
+
+# Marketing / release notes
+F95.md
+RELEASE_NOTES_*.md
