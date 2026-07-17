@@ -109,7 +109,10 @@ class RPGMTranslatorApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("1200x780")
+        # Usa le dimensioni dello schermo per avviare in fit screen
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        self.geometry(f"{screen_width}x{screen_height}")
         self.minsize(950, 650)
         self.configure(fg_color=COLOR_BG)
 
@@ -154,9 +157,9 @@ class RPGMTranslatorApp(ctk.CTk):
         self.path_entry = ctk.CTkEntry(path_row, width=520, placeholder_text="...")
         self.path_entry.pack(side="left", padx=(0, 6))
         ctk.CTkButton(path_row, text=t(self.current_lang, "btn_app"), width=60,
-                      fg_color=COLOR_ACCENT, command=self._pick_app).pack(side="left", padx=2)
+                      fg_color=COLOR_ACCENT, text_color="black", command=self._pick_app).pack(side="left", padx=2)
         ctk.CTkButton(path_row, text=t(self.current_lang, "btn_folder"), width=80,
-                      fg_color=COLOR_ACCENT, command=self._pick_folder).pack(side="left", padx=2)
+                      fg_color=COLOR_ACCENT, text_color="black", command=self._pick_folder).pack(side="left", padx=2)
 
         self.game_status = ctk.CTkLabel(game_frame, text=t(self.current_lang, "no_game"),
                                         text_color=COLOR_SUBTEXT, font=ctk.CTkFont(size=11))
@@ -226,46 +229,49 @@ class RPGMTranslatorApp(ctk.CTk):
 
         self.btn_translate = ctk.CTkButton(bottom, text=f"▶  {t(self.current_lang, 'analyze_translate')}",
                                            fg_color=COLOR_BTN_SUCCESS, hover_color="#047857",
-                                           width=180, command=self._analyze_translate)
+                                           text_color="white", width=180, command=self._analyze_translate)
         self.btn_translate.pack(side="left", padx=10, pady=10)
 
         self.btn_cancel = ctk.CTkButton(bottom, text=t(self.current_lang, "cancel"),
                                         fg_color=COLOR_BTN_WARN, hover_color="#b45309",
-                                        width=100, command=self._cancel, state="disabled")
+                                        text_color="white", width=100, command=self._cancel, state="disabled")
         self.btn_cancel.pack(side="left", padx=6, pady=10)
 
         self.btn_save = ctk.CTkButton(bottom, text=t(self.current_lang, "save"),
-                                      fg_color=COLOR_ACCENT, width=110, command=self._save_translation)
+                                      fg_color=COLOR_ACCENT, text_color="black",
+                                      width=110, command=self._save_translation)
         self.btn_save.pack(side="left", padx=6, pady=10)
         self.btn_save.configure(state="disabled")
 
         self.btn_export = ctk.CTkButton(bottom, text=t(self.current_lang, "export"),
-                                        fg_color=COLOR_ACCENT_MAGENTA, width=110, command=self._export_patch)
+                                        fg_color=COLOR_ACCENT_MAGENTA, text_color="white",
+                                        width=110, command=self._export_patch)
         self.btn_export.pack(side="left", padx=6, pady=10)
         self.btn_export.configure(state="disabled")
 
         self.btn_restore_backup = ctk.CTkButton(bottom, text=t(self.current_lang, "restore_backup"),
                                                 fg_color=COLOR_BTN_WARN, hover_color="#b45309",
-                                                width=120, command=self._restore_backup)
+                                                text_color="white", width=120, command=self._restore_backup)
         self.btn_restore_backup.pack(side="left", padx=6, pady=10)
         self.btn_restore_backup.configure(state="disabled")
 
         self.btn_forge = ctk.CTkButton(bottom, text=t(self.current_lang, "install_forge"),
-                                       fg_color=COLOR_ACCENT_GOLD, width=140, command=self._install_forge)
+                                       fg_color=COLOR_ACCENT_GOLD, text_color="black",
+                                       width=140, command=self._install_forge)
         self.btn_forge.pack(side="left", padx=6, pady=10)
         self.btn_forge.configure(state="disabled")
 
         self.btn_clear_cache = ctk.CTkButton(bottom, text=t(self.current_lang, "clear_cache"),
                                              fg_color=COLOR_BTN_WARN, hover_color="#b45309",
-                                             width=100, command=self._clear_cache)
+                                             text_color="white", width=100, command=self._clear_cache)
         self.btn_clear_cache.pack(side="right", padx=6, pady=10)
 
         ctk.CTkButton(bottom, text=t(self.current_lang, "settings"), fg_color=COLOR_ACCENT,
-                      width=100, command=self._open_settings).pack(side="right", padx=10, pady=10)
+                      text_color="black", width=100, command=self._open_settings).pack(side="right", padx=10, pady=10)
 
         next_lang = "IT" if self.current_lang == "en" else "EN"
         ctk.CTkButton(bottom, text=next_lang, fg_color=COLOR_ACCENT,
-                      width=50, command=self._toggle_lang).pack(side="right", padx=6, pady=10)
+                      text_color="black", width=50, command=self._toggle_lang).pack(side="right", padx=6, pady=10)
 
         # Options row
         opts = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=44)
@@ -366,11 +372,11 @@ class RPGMTranslatorApp(ctk.CTk):
         btn_row = ctk.CTkFrame(editor_frame, fg_color="transparent")
         btn_row.grid(row=2, column=0, sticky="e", padx=10, pady=(0, 6))
         self.btn_edit_save = ctk.CTkButton(btn_row, text="Save Edit", width=100,
-                                           fg_color=COLOR_BTN_MAIN, command=self._save_edit)
+                                           fg_color=COLOR_BTN_MAIN, text_color="white", command=self._save_edit)
         self.btn_edit_save.pack(side="left", padx=4)
         self.btn_edit_save.configure(state="disabled")
         self.btn_replace_all = ctk.CTkButton(btn_row, text="Replace All", width=100,
-                                             fg_color=COLOR_ACCENT, command=self._open_replace_dialog)
+                                             fg_color=COLOR_ACCENT, text_color="black", command=self._open_replace_dialog)
         self.btn_replace_all.pack(side="left", padx=4)
         self.btn_replace_all.configure(state="disabled")
 
