@@ -667,13 +667,30 @@ class Translator:
         def rep(m):
             nonlocal counter
             k = f"@@RNT{counter}@@"; mapping[k] = m.group(0); counter += 1; return k
-        return self.RE_TOKEN.sub(rep, text), mapping
+        protected = self.RE_TOKEN.sub(rep, text)
+        
+        # Proteggi i nomi dei personaggi se preserve_names è attivo
+        if self.cfg.preserve_names and self.cfg.character_names:
+            # Ordina i nomi per lunghezza decrescente per evitare problemi di sovrapposizione
+            # (es. "Alexander" prima di "Alex")
+            sorted_names = sorted(self.cfg.character_names, key=len, reverse=True)
+            for name in sorted_names:
+                # Usa word boundaries per evitare di sostituire parti di parole
+                pattern = r'\b' + re.escape(name) + r'\b'
+                def name_rep(m):
+                    nonlocal counter
+                    k = f"@@NAME{counter}@@"; mapping[k] = m.group(0); counter += 1; return k
+                protected = re.sub(pattern, name_rep, protected, flags=re.IGNORECASE)
+        
+        return protected, mapping
 
     def _restore(self, text: str, mapping: dict) -> str:
+        # Prima ripristina i placeholder diretti (inclusi i nomi)
         for k, v in mapping.items():
             text = text.replace(k, v)
+        # Poi gestisci la normalizzazione per i token RNT che potrebbero essere stati modificati dal traduttore
         def norm(s): return re.sub(r"[^A-Za-z0-9]", "", s).upper()
-        norm_map = {norm(k): v for k, v in mapping.items()}
+        norm_map = {norm(k): v for k, v in mapping.items() if k.startswith("@@RNT")}
         if norm_map:
             def repl(m):
                 return norm_map.get(norm(m.group(0)), m.group(0))
