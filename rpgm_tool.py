@@ -189,6 +189,12 @@ class RPGMTranslatorApp(ctk.CTk):
                                     value=val, command=self._apply_filter)
             rb.pack(side="left", padx=4)
 
+        # Select All checkbox
+        self.select_all_var = ctk.StringVar(value="off")
+        self.select_all_checkbox = ctk.CTkCheckBox(ctrl, text="Select All", variable=self.select_all_var,
+                                                   onvalue="on", offvalue="off", command=self._on_select_all)
+        self.select_all_checkbox.pack(side="left", padx=(20, 4))
+
         ctk.CTkLabel(ctrl, text="Source:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
         self.source_lang_var = ctk.StringVar(value=self.settings.get("source_lang", "Auto"))
         self.source_lang_combo = ctk.CTkComboBox(ctrl, values=["Auto"] + list(LANGUAGES.keys()), width=130,
@@ -491,6 +497,16 @@ class RPGMTranslatorApp(ctk.CTk):
             self._selected_indices.add(abs_i)
         else:
             self._selected_indices.discard(abs_i)
+        self._render_page()
+        self.btn_delete_row.configure(state="normal" if self._selected_indices else "disabled")
+
+    def _on_select_all(self):
+        if self.select_all_var.get() == "on":
+            # Seleziona tutte le righe nella lista filtrata
+            self._selected_indices = set(range(len(self.filtered)))
+        else:
+            # Deseleziona tutte le righe
+            self._selected_indices.clear()
         self._render_page()
         self.btn_delete_row.configure(state="normal" if self._selected_indices else "disabled")
 
