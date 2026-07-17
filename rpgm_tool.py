@@ -548,7 +548,16 @@ class RPGMTranslatorApp(ctk.CTk):
         ctk.CTkCheckBox(dialog, text="Case sensitive", variable=case_sensitive_var).pack(anchor="w", padx=20, pady=(0, 8))
 
         filtered_only_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(dialog, text="Only in filtered items", variable=filtered_only_var).pack(anchor="w", padx=20, pady=(0, 12))
+        ctk.CTkCheckBox(dialog, text="Only in filtered items", variable=filtered_only_var).pack(anchor="w", padx=20, pady=(0, 8))
+
+        # Search scope: original, translation, or both
+        search_scope_var = ctk.StringVar(value="translation")
+        scope_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        scope_frame.pack(anchor="w", padx=20, pady=(0, 12))
+        ctk.CTkLabel(scope_frame, text="Search in:", text_color=COLOR_SUBTEXT).pack(side="left")
+        ctk.CTkRadioButton(scope_frame, text="Original", variable=search_scope_var, value="original").pack(side="left", padx=(8, 4))
+        ctk.CTkRadioButton(scope_frame, text="Translation", variable=search_scope_var, value="translation").pack(side="left", padx=4)
+        ctk.CTkRadioButton(scope_frame, text="Both", variable=search_scope_var, value="both").pack(side="left", padx=4)
 
         # Buttons
         btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
@@ -563,26 +572,60 @@ class RPGMTranslatorApp(ctk.CTk):
 
             case_sensitive = case_sensitive_var.get()
             only_filtered = filtered_only_var.get()
+            search_scope = search_scope_var.get()
 
             # Scegli gli items su cui applicare
             target_items = self.filtered if only_filtered else self.items
 
             # Debug: mostra quanti items stanno sendo controllati
-            translated_items = [i for i in target_items if i.translated]
-            print(f"DEBUG: Total items: {len(target_items)}, Translated items: {len(translated_items)}")
-            if translated_items:
-                print(f"DEBUG: First translated item: '{translated_items[0].translated[:50]}...'")
+            print(f"DEBUG: Total items: {len(target_items)}, Search scope: {search_scope}")
+            if target_items:
+                print(f"DEBUG: First item text: '{target_items[0].text[:50]}...'")
+                print(f"DEBUG: First item translated: '{target_items[0].translated[:50] if target_items[0].translated else 'empty'}...'")
 
             count = 0
             for item in target_items:
-                if item.translated:
+                if search_scope == "original":
+                    # Cerca e sostituisci nell'originale
                     if case_sensitive:
-                        if find_text in item.translated:
+                        if find_text in item.text:
+                            item.text = item.text.replace(find_text, replace_text)
+                            count += 1
+                    else:
+                        if find_text.lower() in item.text.lower():
+                            import re
+                            pattern = re.compile(re.escape(find_text), re.IGNORECASE)
+                            item.text = pattern.sub(replace_text, item.text)
+                            count += 1
+                elif search_scope == "translation":
+                    # Cerca e sostituisci nella traduzione
+                    if item.translated:
+                        if case_sensitive:
+                            if find_text in item.translated:
+                                item.translated = item.translated.replace(find_text, replace_text)
+                                count += 1
+                        else:
+                            if find_text.lower() in item.translated.lower():
+                                import re
+                                pattern = re.compile(re.escape(find_text), re.IGNORECASE)
+                                item.translated = pattern.sub(replace_text, item.translated)
+                                count += 1
+                else:  # both
+                    # Cerca e sostituisci in entrambi
+                    if case_sensitive:
+                        if find_text in item.text:
+                            item.text = item.text.replace(find_text, replace_text)
+                            count += 1
+                        if item.translated and find_text in item.translated:
                             item.translated = item.translated.replace(find_text, replace_text)
                             count += 1
                     else:
-                        if find_text.lower() in item.translated.lower():
-                            # Case-insensitive replace
+                        if find_text.lower() in item.text.lower():
+                            import re
+                            pattern = re.compile(re.escape(find_text), re.IGNORECASE)
+                            item.text = pattern.sub(replace_text, item.text)
+                            count += 1
+                        if item.translated and find_text.lower() in item.translated.lower():
                             import re
                             pattern = re.compile(re.escape(find_text), re.IGNORECASE)
                             item.translated = pattern.sub(replace_text, item.translated)
@@ -596,7 +639,7 @@ class RPGMTranslatorApp(ctk.CTk):
                 messagebox.showinfo("Replace All", f"Replaced in {count} items")
                 dialog.destroy()
             else:
-                messagebox.showinfo("Replace All", f"No matches found. Checked {len(translated_items)} translated items.")
+                messagebox.showinfo("Replace All", f"No matches found. Checked {len(target_items)} items in {search_scope}.")
 
         ctk.CTkButton(btn_frame, text="Replace", fg_color=COLOR_BTN_SUCCESS, width=100,
                       command=do_replace).pack(side="left", padx=4)
