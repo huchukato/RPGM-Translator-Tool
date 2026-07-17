@@ -22,6 +22,7 @@ from rpgm_detector import detect_engine, DetectionError
 from rpgm_extractor import RPGMExtractor
 from rpgm_forge import ensure_forge_js, install_forge
 from rpgm_parser import ExtractedString, strip_script_tokens, restore_script_tokens
+from rpgm_translator import extract_character_names
 from rpgm_settings import (
     BACKEND_LABELS, BACKENDS, DEFAULT_SETTINGS, LANGUAGES, SETTINGS_FILE,
     UI_TEXTS, load_settings, save_settings, t,
@@ -721,6 +722,10 @@ class RPGMTranslatorApp(ctk.CTk):
         lang_name = self.lang_var.get()
         target = LANGUAGES.get(lang_name, "it")
         s = self.settings
+        preserve_names = bool(self.preserve_names_var.get())
+        character_names = frozenset()
+        if preserve_names and self.extractor:
+            character_names = extract_character_names(self.extractor.root)
         return TranslatorConfig(
             backend=BACKENDS[self.backend_var.get()],
             source_lang="en",
@@ -731,7 +736,8 @@ class RPGMTranslatorApp(ctk.CTk):
             llama_model_repo=s.get("llama_model_repo", DEFAULT_SETTINGS["llama_model_repo"]),
             llama_model_file=s.get("llama_model_file", ""),
             translation_profile=self.profile_var.get(),
-            preserve_names=bool(self.preserve_names_var.get()),
+            preserve_names=preserve_names,
+            character_names=character_names,
             translate_menu=False,
         )
 

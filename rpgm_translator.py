@@ -16,6 +16,27 @@ import threading
 import time
 import requests
 
+
+def extract_character_names(game_root: Path) -> frozenset[str]:
+    """Estrae i nomi dei personaggi dal file Actors.json del gioco."""
+    actors_path = game_root / "data" / "Actors.json"
+    names = set()
+    if actors_path.exists():
+        try:
+            data = json.loads(actors_path.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                for actor in data:
+                    if isinstance(actor, dict):
+                        name = actor.get("name", "")
+                        if name and isinstance(name, str) and name.strip():
+                            names.add(name.strip())
+        except Exception:
+            pass
+    # Aggiungi nomi NPC comuni che potrebbero non essere in Actors.json
+    common_npc_names = {"Elijah"}  # NPC comuni che potrebbero non essere in Actors.json
+    names.update(common_npc_names)
+    return frozenset(names)
+
 try:
     from deep_translator import GoogleTranslator
     GOOGLE_OK = True

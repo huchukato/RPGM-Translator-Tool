@@ -247,6 +247,11 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             # Pattern comuni di nomi file RPG Maker: CHR-{Name}-{Part}{Num}.png
             if re.match(r"CHR-[A-Za-z]+-[A-Za-z]+\d+\.png", literal):
                 return False
+            # Prefissi e suffissi di nomi file dinamici (es. "CHR-", "-Body", "-Face")
+            if re.match(r"^[A-Z]{2,}-$", literal):
+                return False
+            if re.match(r"^-[A-Z][a-z]+$", literal):
+                return False
         # Se la stringa contiene graffe non bilanciate o simboli chiaramente di codice,
         # probabilmente è codice o placeholder, non testo visibile.
         if literal.count("{") != literal.count("}"):
@@ -266,6 +271,15 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         for m in str_re.finditer(script):
             current_code += script[prev_end:m.start()]
             literal = m.group(1)
+            # Controlla se il letterale è un argomento diretto di $gameVariables.setValue o $gameVariables.value
+            if "$gameVariables.setValue" in current_code or "$gameVariables.value" in current_code:
+                # Se è vicino alla chiamata di funzione, controlla se è un nome breve (probabilmente NPC)
+                if re.search(r'\$gameVariables\.(setValue|value)\s*\([^)]*$', current_code):
+                    # Salta solo se è una singola parola senza spazi (probabilmente un nome NPC)
+                    if " " not in literal:
+                        current_code += m.group(0)
+                        prev_end = m.end()
+                        continue
             prefix_match = dialogue_prefix_re.match(literal)
             candidate = literal[prefix_match.end():] if prefix_match else ""
             prefix = prefix_match.group(1) if prefix_match and (" " in candidate or candidate.endswith((".", "!", "?", "…"))) else ""
