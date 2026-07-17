@@ -292,13 +292,27 @@ class RPGMTranslatorApp(ctk.CTk):
 
         main_frame = ctk.CTkFrame(self.tab_strings, fg_color="transparent")
         main_frame.grid(row=0, column=0, sticky="nsew")
-        main_frame.grid_rowconfigure(0, weight=3)
-        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_rowconfigure(0, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_columnconfigure(1, weight=0)
+
+        # File filter sidebar
+        file_sidebar = ctk.CTkFrame(main_frame, fg_color=COLOR_PANEL, width=200)
+        file_sidebar.grid(row=0, column=0, sticky="ns", padx=(8, 4), pady=8)
+        file_sidebar.grid_propagate(False)
+
+        ctk.CTkLabel(file_sidebar, text="Files", text_color=COLOR_SUBTEXT,
+                    font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(8, 4))
+
+        self.file_filter_frame = ctk.CTkScrollableFrame(file_sidebar, fg_color="transparent")
+        self.file_filter_frame.pack(fill="both", expand=True, padx=4, pady=4)
+
+        self.file_filter_var = ctk.StringVar(value="All files")
+        self.file_radio_buttons = {}
 
         # Table area
         table_outer = ctk.CTkFrame(main_frame, fg_color=COLOR_BG)
-        table_outer.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        table_outer.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
         table_outer.grid_rowconfigure(2, weight=1)
         table_outer.grid_columnconfigure(0, weight=1)
 
@@ -320,12 +334,6 @@ class RPGMTranslatorApp(ctk.CTk):
         self.search_scope_combo = ctk.CTkComboBox(search_row, values=list(self._search_scopes), width=150,
                                                    variable=self.search_scope_var, command=self._on_search_scope_change)
         self.search_scope_combo.pack(side="left", padx=4, pady=4)
-
-        ctk.CTkLabel(search_row, text="File:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(12, 4))
-        self.file_filter_var = ctk.StringVar(value="All files")
-        self.file_filter_combo = ctk.CTkOptionMenu(search_row, values=["All files"], width=200,
-                                                   variable=self.file_filter_var, command=self._on_file_filter_change)
-        self.file_filter_combo.pack(side="left", padx=4, pady=4)
 
         # Header
         header = ctk.CTkFrame(table_outer, fg_color=COLOR_ACCENT, height=28)
@@ -541,11 +549,20 @@ class RPGMTranslatorApp(ctk.CTk):
         """Aggiorna le opzioni del filtro file basandosi sugli items caricati."""
         if not self.items:
             return
+        # Pulisci i radiobutton esistenti
+        for widget in self.file_filter_frame.winfo_children():
+            widget.destroy()
+        self.file_radio_buttons.clear()
+
         files = sorted(set(item.file for item in self.items))
-        new_values = ["All files"] + files
-        self.file_filter_combo.configure(values=new_values)
-        # Resetta il valore selezionato a "All files" per evitare problemi con valori non più validi
-        self.file_filter_var.set("All files")
+        all_files = ["All files"] + files
+
+        for file_name in all_files:
+            rb = ctk.CTkRadioButton(self.file_filter_frame, text=file_name,
+                                   variable=self.file_filter_var, value=file_name,
+                                   command=self._on_file_filter_change)
+            rb.pack(anchor="w", pady=2)
+            self.file_radio_buttons[file_name] = rb
 
     def _open_replace_dialog(self):
         """Apre il dialogo per Replace All."""
