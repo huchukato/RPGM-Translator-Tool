@@ -292,27 +292,13 @@ class RPGMTranslatorApp(ctk.CTk):
 
         main_frame = ctk.CTkFrame(self.tab_strings, fg_color="transparent")
         main_frame.grid(row=0, column=0, sticky="nsew")
-        main_frame.grid_rowconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(0, weight=3)
+        main_frame.grid_rowconfigure(1, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=0)
-
-        # File filter sidebar
-        file_sidebar = ctk.CTkFrame(main_frame, fg_color=COLOR_PANEL, width=200)
-        file_sidebar.grid(row=0, column=0, sticky="ns", padx=(8, 4), pady=8)
-        file_sidebar.grid_propagate(False)
-
-        ctk.CTkLabel(file_sidebar, text="Files", text_color=COLOR_SUBTEXT,
-                    font=ctk.CTkFont(size=12, weight="bold")).pack(pady=(8, 4))
-
-        self.file_filter_frame = ctk.CTkScrollableFrame(file_sidebar, fg_color="transparent")
-        self.file_filter_frame.pack(fill="both", expand=True, padx=4, pady=4)
-
-        self.file_filter_var = ctk.StringVar(value="All files")
-        self.file_radio_buttons = {}
 
         # Table area
         table_outer = ctk.CTkFrame(main_frame, fg_color=COLOR_BG)
-        table_outer.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
+        table_outer.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         table_outer.grid_rowconfigure(2, weight=1)
         table_outer.grid_columnconfigure(0, weight=1)
 
@@ -520,11 +506,6 @@ class RPGMTranslatorApp(ctk.CTk):
         else:
             visible = self.items
 
-        # Filtro per file
-        file_filter = self.file_filter_var.get()
-        if file_filter != "All files":
-            visible = [i for i in visible if i.file == file_filter]
-
         query = self.search_var.get().strip().casefold()
         scope = self._search_scopes.get(self.search_scope_var.get(), "both")
         if query:
@@ -542,27 +523,6 @@ class RPGMTranslatorApp(ctk.CTk):
     def _on_search_scope_change(self, _value: str):
         self._apply_filter()
 
-    def _on_file_filter_change(self, _value: str):
-        self._apply_filter()
-
-    def _update_file_filter_options(self):
-        """Aggiorna le opzioni del filtro file basandosi sugli items caricati."""
-        if not self.items:
-            return
-        # Pulisci i radiobutton esistenti
-        for widget in self.file_filter_frame.winfo_children():
-            widget.destroy()
-        self.file_radio_buttons.clear()
-
-        files = sorted(set(item.file for item in self.items))
-        all_files = ["All files"] + files
-
-        for file_name in all_files:
-            rb = ctk.CTkRadioButton(self.file_filter_frame, text=file_name,
-                                   variable=self.file_filter_var, value=file_name,
-                                   command=self._on_file_filter_change)
-            rb.pack(anchor="w", pady=2)
-            self.file_radio_buttons[file_name] = rb
 
     def _open_replace_dialog(self):
         """Apre il dialogo per Replace All."""
@@ -607,6 +567,12 @@ class RPGMTranslatorApp(ctk.CTk):
             # Scegli gli items su cui applicare
             target_items = self.filtered if only_filtered else self.items
 
+            # Debug: mostra quanti items stanno sendo controllati
+            translated_items = [i for i in target_items if i.translated]
+            print(f"DEBUG: Total items: {len(target_items)}, Translated items: {len(translated_items)}")
+            if translated_items:
+                print(f"DEBUG: First translated item: '{translated_items[0].translated[:50]}...'")
+
             count = 0
             for item in target_items:
                 if item.translated:
@@ -622,6 +588,7 @@ class RPGMTranslatorApp(ctk.CTk):
                             item.translated = pattern.sub(replace_text, item.translated)
                             count += 1
 
+            print(f"DEBUG: Replacements made: {count}")
             if count > 0:
                 self._render_table(self.filtered if only_filtered else self.items)
                 self.btn_save.configure(state="normal")
@@ -629,7 +596,7 @@ class RPGMTranslatorApp(ctk.CTk):
                 messagebox.showinfo("Replace All", f"Replaced in {count} items")
                 dialog.destroy()
             else:
-                messagebox.showinfo("Replace All", "No matches found")
+                messagebox.showinfo("Replace All", f"No matches found. Checked {len(translated_items)} translated items.")
 
         ctk.CTkButton(btn_frame, text="Replace", fg_color=COLOR_BTN_SUCCESS, width=100,
                       command=do_replace).pack(side="left", padx=4)
@@ -782,7 +749,6 @@ class RPGMTranslatorApp(ctk.CTk):
                 msg += f" ({translated_count} from cache)"
             self.log(msg)
             self.root_after(lambda: self._set_progress(1.0, msg))
-            self.root_after(self._update_file_filter_options)
             self.root_after(self._on_work_done)
         except Exception as e:
             self._handle_error(e)
