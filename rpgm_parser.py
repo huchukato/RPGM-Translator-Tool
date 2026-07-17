@@ -150,6 +150,9 @@ def is_translatable_text(clean: str) -> bool:
     # Singolo carattere ASCII
     if len(s) == 1 and s.isascii():
         return False
+    # Pattern specifici di nomi file RPG Maker (CHR-{Name}-{Part}{Num}.png)
+    if re.match(r"CHR-[A-Za-z]+-[A-Za-z]+\d+\.png", s):
+        return False
     # Nomi file/asset audio, immagini, video, json, etc.
     if FILE_EXTENSIONS_RE.search(s):
         return False
