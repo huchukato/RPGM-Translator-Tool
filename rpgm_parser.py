@@ -256,20 +256,16 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         # probabilmente è codice o placeholder, non testo visibile.
         if literal.count("{") != literal.count("}"):
             return False
-        # Permetti < e > solo quando sono parte di prefissi di dialogo RPG Maker (es. NPCShCl<.)
-        if any(c in literal for c in "$[]+=\\/"):
+        if any(c in literal for c in "$[]<>+=\\/"):
             return False
-        # Controlla se < e > sono usati come prefissi di dialogo (seguiti da punto o all'inizio)
-        if "<" in literal or ">" in literal:
-            # Permetti solo se il pattern corrisponde a un prefisso di dialogo RPG Maker
-            if not re.search(r'^[A-Za-z0-9]+[<>]\.', literal):
-                return False
         return True
 
     def add_script_text(script: str, keys: list[str | int]) -> bool:
         """Estrae stringhe letterali traducibili da un comando Script (code 355/655/122/357)."""
         str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
         dialogue_prefix_re = re.compile(r"^([A-Za-z][A-Za-z0-9#^>{}]*\.)")
+        # Regex per riconoscere prefissi RPG Maker con separatori speciali (es. NPCShCl<., JuSaOp}No1.)
+        rpg_maker_prefix_re = re.compile(r"^([A-Za-z0-9]+[<>{}\^][A-Za-z0-9]*\.)")
         literals: list[str] = []
         code_segments: list[str] = []
         current_code = ""
@@ -286,6 +282,17 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                         current_code += m.group(0)
                         prev_end = m.end()
                         continue
+            # Prima controlla se è un prefisso RPG Maker con separatore speciale
+            rpg_maker_match = rpg_maker_prefix_re.match(literal)
+            if rpg_maker_match:
+                prefix = rpg_maker_match.group(1)
+                translatable = literal[len(prefix):]
+                if _is_script_literal_translatable(translatable):
+                    code_segments.append(current_code + '"' + prefix)
+                    literals.append(translatable)
+                    current_code = ""
+                    prev_end = m.end() - 1  # include closing quote in the next code segment
+                    continue
             prefix_match = dialogue_prefix_re.match(literal)
             candidate = literal[prefix_match.end():] if prefix_match else ""
             prefix = prefix_match.group(1) if prefix_match and (" " in candidate or candidate.endswith((".", "!", "?", "…"))) else ""
