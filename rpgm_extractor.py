@@ -51,11 +51,12 @@ class RPGMExtractor:
             if progress_cb:
                 progress_cb(done, total, f"Parsing {file_name}")
 
-        if plugins_js.exists():
-            items.extend(parse_plugins_js(plugins_js, idx_ref))
-            done += 1
-            if progress_cb:
-                progress_cb(done, total, "Parsing plugins.js")
+        # Disabilitato parsing plugin - l'utente non vuole tradurre i plugin
+        # if plugins_js.exists():
+        #     items.extend(parse_plugins_js(plugins_js, idx_ref))
+        #     done += 1
+        #     if progress_cb:
+        #         progress_cb(done, total, "Parsing plugins.js")
 
         self.files_count = total
         self.items = items
