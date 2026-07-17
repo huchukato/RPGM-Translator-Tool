@@ -164,6 +164,20 @@ class Translator:
                 raise TranslationError("Traduzione annullata.")
             translated = self._translate_batch(pending, log_cb, progress_cb, cached_count, total)
             for orig, tr in zip(pending, translated):
+                # Workaround per testo molto breve che Google potrebbe non tradurre
+                # Se la traduzione è identica all'originale e il testo è molto breve,
+                # prova a normalizzare caratteri speciali e ritradurre
+                if tr == orig and len(orig.strip()) < 6:
+                    normalized = orig.replace("…", "...").replace("–", "-").replace("—", "--")
+                    if normalized != orig:
+                        # Prova a tradurre la versione normalizzata
+                        try:
+                            normalized_translated = self._translate_batch([normalized], log_cb, progress_cb, cached_count, total)
+                            if normalized_translated and normalized_translated[0] != normalized:
+                                # Ripristina i caratteri speciali originali nella traduzione
+                                tr = normalized_translated[0].replace("...", "…").replace("-", "–").replace("--", "—")
+                        except Exception:
+                            pass  # Se fallisce, mantieni la traduzione originale
                 self.cache[orig] = tr
         else:
             done = cached_count
