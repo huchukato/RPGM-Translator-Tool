@@ -344,6 +344,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                         prev_end = m.end()
                         continue
                     # Per value 21, procedi con la logica normale di traduzione
+            # Controlla anche nel literal se contiene il pattern di gameVariables
+            if re.search(r'\$gameVariables\.(setValue|value)\s*\(\s*(?!21\s*[,\)])\d+\s*[,\)]', literal):
+                # Salta la traduzione per tutti i gameVariables tranne value 21
+                current_code += m.group(0)
+                prev_end = m.end()
+                continue
             # Salta commenti JavaScript (//Upset, //Joyful, etc.)
             if literal.strip().startswith("//"):
                 current_code += m.group(0)
