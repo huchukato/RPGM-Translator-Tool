@@ -362,6 +362,9 @@ class RPGMTranslatorApp(ctk.CTk):
         self.edit_text = ctk.CTkTextbox(editor_frame, height=80, font=ctk.CTkFont(size=12))
         self.edit_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
         self.edit_text.configure(state="disabled")
+        # Aggiungi shortcut CMD+INVIO (Mac) o Ctrl+INVIO (Windows/Linux) per salvare
+        self.edit_text.bind("<Command-Return>", lambda e: self._save_edit())
+        self.edit_text.bind("<Control-Return>", lambda e: self._save_edit())
 
         btn_row = ctk.CTkFrame(editor_frame, fg_color="transparent")
         btn_row.grid(row=2, column=0, sticky="e", padx=10, pady=(0, 6))
