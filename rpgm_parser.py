@@ -241,6 +241,9 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             # Espressioni tipo Math.random() o www.example.com: punto senza spazi
             if "." in literal.rstrip(".!?…"):
                 return False
+            # Pattern comuni di nomi file RPG Maker: CHR-{Name}-{Part}{Num}.png
+            if re.match(r"CHR-[A-Za-z]+-[A-Za-z]+\d+\.png", literal):
+                return False
         # Se la stringa contiene graffe non bilanciate o simboli chiaramente di codice,
         # probabilmente è codice o placeholder, non testo visibile.
         if literal.count("{") != literal.count("}"):
