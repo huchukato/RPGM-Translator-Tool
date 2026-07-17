@@ -300,6 +300,19 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             # Identificatori camelCase come PoliceA, PoliceB
             if re.search(r"[a-z][A-Z]", literal):
                 return False
+            # Identificatori PascalCase come MCTowel, EthanShirtless (più di 2 maiuscole all'inizio)
+            if re.match(r"^[A-Z]{2,}[a-z]+", literal):
+                return False
+            # Parole chiave di codice come syntax, var, let, const, etc.
+            code_keywords = {"syntax", "var", "let", "const", "function", "return",
+                             "if", "else", "for", "while", "switch", "case", "break",
+                             "continue", "new", "this", "true", "false", "null", "undefined",
+                             "typeof", "instanceof", "void", "delete", "in", "of"}
+            if literal.lower() in code_keywords:
+                return False
+            # Stringhe molto corte (2-3 char) senza spazi: quasi sempre codice
+            if len(literal) <= 3 and re.fullmatch(r"[A-Za-z]+", literal):
+                return False
             # Espressioni tipo Math.random() o www.example.com: punto senza spazi
             if "." in literal.rstrip(".!?…"):
                 return False
@@ -344,6 +357,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                         prev_end = m.end()
                         continue
                     # Per value 21, procedi con la logica normale di traduzione
+                # Se il current_code contiene $gameVariables.value (non setValue) in un'espressione
+                # (es. showPicture con CHR- + $gameVariables.value(24) + "-Body"), salta la stringa
+                elif "$gameVariables.value(" in current_code and "$gameVariables.setValue" not in current_code:
+                    current_code += m.group(0)
+                    prev_end = m.end()
+                    continue
             # Controlla anche nel literal se contiene il pattern di gameVariables
             if re.search(r'\$gameVariables\.(setValue|value)\s*\(\s*(?!21\s*[,\)])\d+\s*[,\)]', literal):
                 # Salta la traduzione per tutti i gameVariables tranne value 21
