@@ -23,7 +23,6 @@ test_game/
 test_export/
 *.log
 trans_cache.json
-F95.md
 
 # Build / lock files
 build.sh
