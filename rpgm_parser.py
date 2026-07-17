@@ -355,6 +355,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                 current_code += m.group(0)
                 prev_end = m.end()
                 continue
+            # Rimuovi pattern di nomi personaggi (es. McBaOp@^) dal literal
+            # Pattern: NomePersonaggio@^ seguito dal testo
+            char_name_pattern = re.match(r'^[A-Za-z]+@\^', literal)
+            if char_name_pattern:
+                # Rimuovi il nome del personaggio e mantieni solo il testo
+                literal = literal[char_name_pattern.end():]
             # Prima controlla se è un prefisso RPG Maker con separatore speciale
             rpg_maker_match = rpg_maker_prefix_re.match(literal)
             if rpg_maker_match:
