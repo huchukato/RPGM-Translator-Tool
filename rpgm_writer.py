@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Callable
 
-from rpgm_parser import ExtractedString, restore_escape_codes
+from rpgm_parser import ExtractedString, restore_escape_codes, recompose_text
 
 
 class WriteError(RuntimeError):
@@ -176,7 +176,12 @@ def _patch_json_file(file_path: Path, file_trans: dict[str, ExtractedString]) ->
         elif isinstance(obj, list) and isinstance(last_key, int) and 0 <= last_key < len(obj):
             current_val = obj[last_key]
         if isinstance(current_val, str):
-            restored = restore_escape_codes(item.translated, item.escape_parts)
+            # Usa il nuovo metodo basato su segmenti se disponibile
+            if item.segments:
+                restored = item.translated  # Già ricomposto durante la traduzione
+            else:
+                # Fallback al vecchio metodo per compatibilità
+                restored = restore_escape_codes(item.translated, item.escape_parts)
             if item.token_map:
                 for ph, code in item.token_map.items():
                     restored = restored.replace(ph, code)
@@ -229,7 +234,12 @@ def _patch_plugins_js(plugins_js_path: Path, file_trans: dict[str, ExtractedStri
         key_str = ".".join(str(k) for k in keys)
         if key_str in file_trans:
             item = file_trans[key_str]
-            restored = restore_escape_codes(item.translated, item.escape_parts)
+            # Usa il nuovo metodo basato su segmenti se disponibile
+            if item.segments:
+                restored = item.translated  # Già ricomposto durante la traduzione
+            else:
+                # Fallback al vecchio metodo per compatibilità
+                restored = restore_escape_codes(item.translated, item.escape_parts)
             return restored
         return val
 

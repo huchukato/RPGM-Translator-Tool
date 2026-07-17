@@ -24,6 +24,7 @@ class ExtractedString:
     clean_text: str = ""
     token_map: dict[str, str] = field(default_factory=dict)
     has_script_tokens: bool = False
+    segments: list[dict] = field(default_factory=list)
 
 
 # Campi testo riconosciuti nei JSON data
@@ -126,6 +127,50 @@ def restore_escape_codes(translated: str, parts: list[dict]) -> str:
     return result
 
 
+def extract_text_segments(text: str) -> list[dict]:
+    """Estrae segmenti alternati di testo e escape code."""
+    segments = []
+    last_idx = 0
+    for match in ESC_RE.finditer(text):
+        if match.start() > last_idx:
+            segments.append({"type": "text", "content": text[last_idx:match.start()]})
+        segments.append({"type": "escape", "content": match.group(0)})
+        last_idx = match.end()
+    if last_idx < len(text):
+        segments.append({"type": "text", "content": text[last_idx:]})
+    return segments
+
+
+def translate_segments(segments: list[dict], translator) -> list[dict]:
+    """Traduce solo i segmenti di testo, mantiene gli escape code."""
+    # Raccogli tutti i segmenti di testo da tradurre
+    text_segments = [(i, s["content"]) for i, s in enumerate(segments) if s["type"] == "text"]
+    if not text_segments:
+        return segments
+    
+    # Traduci in batch usando translate_many
+    texts_to_translate = [content for _, content in text_segments]
+    translations = translator.translate_many(texts_to_translate)
+    
+    # Ricostruisci i segmenti tradotti
+    translated_segments = []
+    text_idx = 0
+    for segment in segments:
+        if segment["type"] == "text":
+            original_content = segment["content"]
+            translated_content = translations.get(original_content, original_content)
+            translated_segments.append({"type": "text", "content": translated_content})
+            text_idx += 1
+        else:
+            translated_segments.append(segment)  # escape code non tradotto
+    return translated_segments
+
+
+def recompose_text(segments: list[dict]) -> str:
+    """Ricomporre il testo dai segmenti."""
+    return "".join(segment["content"] for segment in segments)
+
+
 def strip_script_tokens(text: str) -> str:
     """Rimuove i token RJS dal testo per la visualizzazione nella GUI."""
     if not text:
@@ -219,9 +264,13 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         return texts
 
     def add_text(raw: str, kind: str, keys: list[str | int]) -> None:
-        clean, parts = extract_escape_codes(raw)
-        if not is_translatable_text(clean):
+        segments = extract_text_segments(raw)
+        # Verifica se c'è almeno un segmento di testo traducibile
+        text_segments = [s for s in segments if s["type"] == "text"]
+        if not any(is_translatable_text(s["content"]) for s in text_segments):
             return
+        # Mantieni compatibilità con clean_text per il sistema di traduzione esistente
+        clean, parts = extract_escape_codes(raw)
         current_id = idx_ref[0]
         idx_ref[0] += 1
         texts.append(ExtractedString(
@@ -232,6 +281,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             key_path=list(keys),
             escape_parts=parts,
             clean_text=clean,
+            segments=segments,
         ))
 
     def _is_script_literal_translatable(literal: str) -> bool:
@@ -273,8 +323,8 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         """Estrae stringhe letterali traducibili da un comando Script (code 355/655/122/357)."""
         str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
         dialogue_prefix_re = re.compile(r"^([A-Za-z][A-Za-z0-9#^>{}]*\.)")
-        # Regex per riconoscere prefissi RPG Maker con separatori speciali (es. NPCShCl<., JuSaOp}No1.)
-        rpg_maker_prefix_re = re.compile(r"^([A-Za-z0-9]+[<>{}\^][A-Za-z0-9]*\.)")
+        # Regex per riconoscere prefissi RPG Maker con separatori speciali (es. NPCShCl<., JuSaOp}No1., GMAnAg<<.)
+        rpg_maker_prefix_re = re.compile(r"^([A-Za-z0-9]+[<>{}\^]+[A-Za-z0-9]*\.)")
         literals: list[str] = []
         code_segments: list[str] = []
         current_code = ""
@@ -483,11 +533,13 @@ def parse_plugins_js(plugins_js_path: Path, idx_ref: list[int]) -> list[Extracte
             last_key = _last_real_key(keys)
             if not is_safe_key(last_key):
                 return
-            if not is_translatable_text(val):
+            segments = extract_text_segments(val)
+            # Verifica se c'è almeno un segmento di testo traducibile
+            text_segments = [s for s in segments if s["type"] == "text"]
+            if not any(is_translatable_text(s["content"]) for s in text_segments):
                 return
+            # Mantieni compatibilità con clean_text per il sistema di traduzione esistente
             clean, parts = extract_escape_codes(val)
-            if not is_translatable_text(clean):
-                return
             current_id = idx_ref[0]
             idx_ref[0] += 1
             texts.append(ExtractedString(
@@ -498,6 +550,7 @@ def parse_plugins_js(plugins_js_path: Path, idx_ref: list[int]) -> list[Extracte
                 key_path=list(keys),
                 escape_parts=parts,
                 clean_text=clean,
+                segments=segments,
             ))
 
     def extract_param_object(obj: Any, keys: list[str | int]) -> None:

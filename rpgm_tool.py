@@ -704,15 +704,52 @@ class RPGMTranslatorApp(ctk.CTk):
         self.root_after(lambda: self._set_progress(base_progress, self._t("progress_translating")))
         cfg = self._make_config()
         self.translator = Translator(cfg)
-        texts = [i.clean_text for i in targets]
-
+        
+        # Separazione: items con segmenti vs senza segmenti
+        items_with_segments = [i for i in targets if i.segments]
+        items_without_segments = [i for i in targets if not i.segments]
+        
         def _progress(done, total):
             frac = base_progress + (done / max(total, 1)) * range_progress
             self.root_after(lambda: self._set_progress(frac, f"{int(frac * 100)}%  ({done}/{total})"))
-
-        result = self.translator.translate_many(texts, progress_cb=_progress)
-        for item in targets:
-            item.translated = result.get(item.clean_text, "")
+        
+        # Traduzione items senza segmenti (metodo vecchio per compatibilità)
+        if items_without_segments:
+            texts = [i.clean_text for i in items_without_segments]
+            result = self.translator.translate_many(texts, progress_cb=_progress)
+            for item in items_without_segments:
+                item.translated = result.get(item.clean_text, "")
+        
+        # Traduzione items con segmenti (nuovo metodo basato su delimitatori)
+        if items_with_segments:
+            from rpgm_parser import recompose_text
+            # Raccogli tutti i segmenti di testo da tutti gli items
+            all_segments = []
+            item_segment_map = []  # mappa item -> indici segmenti
+            for item in items_with_segments:
+                start_idx = len(all_segments)
+                for seg in item.segments:
+                    if seg["type"] == "text":
+                        all_segments.append(seg["content"])
+                end_idx = len(all_segments)
+                item_segment_map.append((item, start_idx, end_idx))
+            
+            # Traduci tutti i segmenti in un unico batch
+            if all_segments:
+                translations = self.translator.translate_many(all_segments, progress_cb=_progress)
+                
+                # Distribuisci le traduzioni back agli items
+                for item, start_idx, end_idx in item_segment_map:
+                    translated_segments = []
+                    for seg in item.segments:
+                        if seg["type"] == "text":
+                            original = seg["content"]
+                            translated = translations.get(original, original)
+                            translated_segments.append({"type": "text", "content": translated})
+                        else:
+                            translated_segments.append(seg)
+                    item.translated = recompose_text(translated_segments)
+        
         done = sum(1 for i in self.items if i.translated)
         msg = self._t("translation_complete", done, len(self.items))
         self.log(msg)
