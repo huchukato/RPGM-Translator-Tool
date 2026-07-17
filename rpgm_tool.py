@@ -186,6 +186,12 @@ class RPGMTranslatorApp(ctk.CTk):
                                     value=val, command=self._apply_filter)
             rb.pack(side="left", padx=4)
 
+        ctk.CTkLabel(ctrl, text="File:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
+        self.file_filter_var = ctk.StringVar(value="All files")
+        self.file_filter_combo = ctk.CTkComboBox(ctrl, values=["All files"], width=200,
+                                                 variable=self.file_filter_var, command=self._on_file_filter_change)
+        self.file_filter_combo.pack(side="left", padx=4)
+
         ctk.CTkLabel(ctrl, text=t(self.current_lang, "target_lang"), text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
         self.lang_var = ctk.StringVar(value=self.settings.get("target_lang", "Italian"))
         self.lang_combo = ctk.CTkComboBox(ctrl, values=list(LANGUAGES.keys()), width=130,
@@ -357,6 +363,10 @@ class RPGMTranslatorApp(ctk.CTk):
                                            fg_color=COLOR_BTN_MAIN, command=self._save_edit)
         self.btn_edit_save.pack(side="left", padx=4)
         self.btn_edit_save.configure(state="disabled")
+        self.btn_replace_all = ctk.CTkButton(btn_row, text="Replace All", width=100,
+                                             fg_color=COLOR_ACCENT, command=self._open_replace_dialog)
+        self.btn_replace_all.pack(side="left", padx=4)
+        self.btn_replace_all.configure(state="disabled")
 
     def _build_log_tab(self):
         self.tab_log.grid_rowconfigure(0, weight=1)
@@ -490,6 +500,11 @@ class RPGMTranslatorApp(ctk.CTk):
         else:
             visible = self.items
 
+        # Filtro per file
+        file_filter = self.file_filter_var.get()
+        if file_filter != "All files":
+            visible = [i for i in visible if i.file == file_filter]
+
         query = self.search_var.get().strip().casefold()
         scope = self._search_scopes.get(self.search_scope_var.get(), "both")
         if query:
@@ -506,6 +521,88 @@ class RPGMTranslatorApp(ctk.CTk):
 
     def _on_search_scope_change(self, _value: str):
         self._apply_filter()
+
+    def _on_file_filter_change(self, _value: str):
+        self._apply_filter()
+
+    def _update_file_filter_options(self):
+        """Aggiorna le opzioni del filtro file basandosi sugli items caricati."""
+        if not self.items:
+            return
+        files = sorted(set(item.file for item in self.items))
+        self.file_filter_combo.configure(values=["All files"] + files)
+
+    def _open_replace_dialog(self):
+        """Apre il dialogo per Replace All."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Replace All")
+        dialog.geometry("400x300")
+        dialog.configure(fg_color=COLOR_PANEL)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Find field
+        ctk.CTkLabel(dialog, text="Find:", text_color=COLOR_SUBTEXT).pack(anchor="w", padx=20, pady=(20, 4))
+        find_entry = ctk.CTkEntry(dialog, width=350)
+        find_entry.pack(padx=20, pady=(0, 12))
+
+        # Replace field
+        ctk.CTkLabel(dialog, text="Replace with:", text_color=COLOR_SUBTEXT).pack(anchor="w", padx=20, pady=(0, 4))
+        replace_entry = ctk.CTkEntry(dialog, width=350)
+        replace_entry.pack(padx=20, pady=(0, 12))
+
+        # Options
+        case_sensitive_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(dialog, text="Case sensitive", variable=case_sensitive_var).pack(anchor="w", padx=20, pady=(0, 8))
+
+        filtered_only_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(dialog, text="Only in filtered items", variable=filtered_only_var).pack(anchor="w", padx=20, pady=(0, 12))
+
+        # Buttons
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(pady=20)
+
+        def do_replace():
+            find_text = find_entry.get().strip()
+            replace_text = replace_entry.get().strip()
+            if not find_text:
+                messagebox.showerror("Error", "Please enter text to find")
+                return
+
+            case_sensitive = case_sensitive_var.get()
+            only_filtered = filtered_only_var.get()
+
+            # Scegli gli items su cui applicare
+            target_items = self.filtered if only_filtered else self.items
+
+            count = 0
+            for item in target_items:
+                if item.translated:
+                    if case_sensitive:
+                        if find_text in item.translated:
+                            item.translated = item.translated.replace(find_text, replace_text)
+                            count += 1
+                    else:
+                        if find_text.lower() in item.translated.lower():
+                            # Case-insensitive replace
+                            import re
+                            pattern = re.compile(re.escape(find_text), re.IGNORECASE)
+                            item.translated = pattern.sub(replace_text, item.translated)
+                            count += 1
+
+            if count > 0:
+                self._render_table(self.filtered if only_filtered else self.items)
+                self.btn_save.configure(state="normal")
+                self.btn_export.configure(state="disabled")
+                messagebox.showinfo("Replace All", f"Replaced in {count} items")
+                dialog.destroy()
+            else:
+                messagebox.showinfo("Replace All", "No matches found")
+
+        ctk.CTkButton(btn_frame, text="Replace", fg_color=COLOR_BTN_SUCCESS, width=100,
+                      command=do_replace).pack(side="left", padx=4)
+        ctk.CTkButton(btn_frame, text="Cancel", fg_color=COLOR_BTN_WARN, width=100,
+                      command=dialog.destroy).pack(side="left", padx=4)
 
     # ─── Game Selection ──────────────────────────────────────────────────
 
@@ -581,6 +678,7 @@ class RPGMTranslatorApp(ctk.CTk):
         if self.items and self.game_path:
             self.btn_save.configure(state="normal")
             self.btn_export.configure(state="normal")
+            self.btn_replace_all.configure(state="normal")
         self._apply_filter()
 
     def _cancel(self):
@@ -652,6 +750,7 @@ class RPGMTranslatorApp(ctk.CTk):
                 msg += f" ({translated_count} from cache)"
             self.log(msg)
             self.root_after(lambda: self._set_progress(1.0, msg))
+            self.root_after(self._update_file_filter_options)
             self.root_after(self._on_work_done)
         except Exception as e:
             self._handle_error(e)
