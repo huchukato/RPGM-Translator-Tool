@@ -272,7 +272,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_clear_manual_edits.pack(side="right", padx=6, pady=10)
 
         self.btn_delete_row = ctk.CTkButton(bottom, text="Delete Row",
-                                            fg_color=COLOR_BTN_WARN, hover_color="#b45309",
+                                            fg_color="#dc2626", hover_color="#b91c1c",
                                             text_color="white", width=100, command=self._delete_selected_row)
         self.btn_delete_row.pack(side="right", padx=6, pady=10)
         self.btn_delete_row.configure(state="disabled")
