@@ -403,14 +403,14 @@ class RPGMTranslatorApp(ctk.CTk):
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
     def _set_icon(self):
-        icon_path = SCRIPT_DIR / "logo_256.png"
+        icon_path = SCRIPT_DIR / "img" / "logo_256.png"
         if icon_path.exists():
             self._tk_icon = ImageTk.PhotoImage(Image.open(icon_path))
             self.iconphoto(True, self._tk_icon)
 
     def _set_logo(self, parent):
         for candidate in ("logo_512.png", "logo_256.png", "logo_48.png"):
-            logo_path = SCRIPT_DIR / candidate
+            logo_path = SCRIPT_DIR / "img" / candidate
             if logo_path.exists():
                 pil_img = Image.open(logo_path)
                 self._ctk_logo = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(64, 64))
