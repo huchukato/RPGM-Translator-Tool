@@ -186,11 +186,11 @@ class RPGMTranslatorApp(ctk.CTk):
                                     value=val, command=self._apply_filter)
             rb.pack(side="left", padx=4)
 
-        ctk.CTkLabel(ctrl, text="File:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
-        self.file_filter_var = ctk.StringVar(value="All files")
-        self.file_filter_combo = ctk.CTkComboBox(ctrl, values=["All files"], width=200,
-                                                 variable=self.file_filter_var, command=self._on_file_filter_change)
-        self.file_filter_combo.pack(side="left", padx=4)
+        ctk.CTkLabel(ctrl, text="Source:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
+        self.source_lang_var = ctk.StringVar(value=self.settings.get("source_lang", "Auto"))
+        self.source_lang_combo = ctk.CTkComboBox(ctrl, values=["Auto"] + list(LANGUAGES.keys()), width=130,
+                                                  variable=self.source_lang_var, command=self._on_source_lang_change)
+        self.source_lang_combo.pack(side="left", padx=4)
 
         ctk.CTkLabel(ctrl, text=t(self.current_lang, "target_lang"), text_color=COLOR_SUBTEXT).pack(side="left", padx=(20, 4))
         self.lang_var = ctk.StringVar(value=self.settings.get("target_lang", "Italian"))
@@ -314,6 +314,12 @@ class RPGMTranslatorApp(ctk.CTk):
         self.search_scope_combo = ctk.CTkComboBox(search_row, values=list(self._search_scopes), width=150,
                                                    variable=self.search_scope_var, command=self._on_search_scope_change)
         self.search_scope_combo.pack(side="left", padx=4, pady=4)
+
+        ctk.CTkLabel(search_row, text="File:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(12, 4))
+        self.file_filter_var = ctk.StringVar(value="All files")
+        self.file_filter_combo = ctk.CTkComboBox(search_row, values=["All files"], width=200,
+                                                 variable=self.file_filter_var, command=self._on_file_filter_change)
+        self.file_filter_combo.pack(side="left", padx=4, pady=4)
 
         # Header
         header = ctk.CTkFrame(table_outer, fg_color=COLOR_ACCENT, height=28)
@@ -857,6 +863,12 @@ class RPGMTranslatorApp(ctk.CTk):
     def _make_config(self) -> TranslatorConfig:
         lang_name = self.lang_var.get()
         target = LANGUAGES.get(lang_name, "it")
+        source_lang_name = self.source_lang_var.get()
+        # Se "Auto", usa "auto" per il rilevamento automatico, altrimenti mappa la lingua
+        if source_lang_name == "Auto":
+            source = "auto"
+        else:
+            source = LANGUAGES.get(source_lang_name, "en")
         s = self.settings
         preserve_names = bool(self.preserve_names_var.get())
         character_names = frozenset()
@@ -864,7 +876,7 @@ class RPGMTranslatorApp(ctk.CTk):
             character_names = extract_character_names(self.extractor.root)
         return TranslatorConfig(
             backend=BACKENDS[self.backend_var.get()],
-            source_lang="en",
+            source_lang=source,
             target_lang=target,
             libre_endpoint=s.get("libre_endpoint", "http://localhost:5000"),
             openrouter_api_key=s.get("openrouter_api_key", ""),
@@ -1019,6 +1031,10 @@ class RPGMTranslatorApp(ctk.CTk):
 
     def _on_target_lang_change(self, language: str):
         self.settings["target_lang"] = language
+        self._save_settings()
+
+    def _on_source_lang_change(self, language: str):
+        self.settings["source_lang"] = language
         self._save_settings()
 
     def _on_backend_change(self, label: str):

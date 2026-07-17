@@ -177,6 +177,7 @@ UI_TEXTS = {
 }
 
 DEFAULT_SETTINGS: dict[str, Any] = {
+    "source_lang": "Auto",
     "target_lang": "Italian",
     "backend": "bing_ultra",
     "translation_profile": "Balanced",
