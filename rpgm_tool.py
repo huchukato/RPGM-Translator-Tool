@@ -29,7 +29,7 @@ from rpgm_settings import (
 )
 from rpgm_translator import OPENROUTER_FREE_MODELS, Translator, TranslatorConfig, TranslationError
 from rpgm_writer import (
-    WriteError, backup_data_dir, export_patch, load_local_cache, patch_data_files, restore_data_backup, save_local_cache,
+    WriteError, add_manual_edit, apply_manual_edits, backup_data_dir, clear_manual_edits, export_patch, load_local_cache, load_manual_edits, patch_data_files, restore_data_backup, save_local_cache,
 )
 
 ctk.set_appearance_mode("dark")
@@ -266,6 +266,17 @@ class RPGMTranslatorApp(ctk.CTk):
                                              text_color="white", width=100, command=self._clear_cache)
         self.btn_clear_cache.pack(side="right", padx=6, pady=10)
 
+        self.btn_clear_manual_edits = ctk.CTkButton(bottom, text="Clear Manual Edits",
+                                                     fg_color=COLOR_BTN_WARN, hover_color="#b45309",
+                                                     text_color="white", width=130, command=self._clear_manual_edits)
+        self.btn_clear_manual_edits.pack(side="right", padx=6, pady=10)
+
+        self.btn_delete_row = ctk.CTkButton(bottom, text="Delete Row",
+                                            fg_color=COLOR_BTN_WARN, hover_color="#b45309",
+                                            text_color="white", width=100, command=self._delete_selected_row)
+        self.btn_delete_row.pack(side="right", padx=6, pady=10)
+        self.btn_delete_row.configure(state="disabled")
+
         ctk.CTkButton(bottom, text=t(self.current_lang, "settings"), fg_color=COLOR_ACCENT,
                       text_color="black", width=100, command=self._open_settings).pack(side="right", padx=10, pady=10)
 
@@ -474,6 +485,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.edit_text.insert("end", strip_script_tokens(item.translated if item.translated else ""))
         self.edit_text.configure(state="normal")
         self.btn_edit_save.configure(state="normal")
+        self.btn_delete_row.configure(state="normal")
 
     def _save_edit(self):
         if self._selected_index is None or self._selected_index >= len(self.filtered):
@@ -485,9 +497,21 @@ class RPGMTranslatorApp(ctk.CTk):
             item.translated = restore_script_tokens(edited_text, item.token_map)
         else:
             item.translated = edited_text
+        
+        # Salva la modifica manuale nel tracking
+        if self.extractor:
+            add_manual_edit(
+                self.extractor.root,
+                item.file,
+                item.key_path,
+                item.text,
+                item.translated,
+                "translated"
+            )
+        
         self._render_page()
         self.btn_save.configure(state="normal")
-        self.btn_export.configure(state="disabled")
+        # Non disabilitare Export Patch - l'utente vuole poter esportare senza salvare
 
     def _prev_page(self):
         if self._page > 0:
@@ -581,19 +605,26 @@ class RPGMTranslatorApp(ctk.CTk):
             target_items = self.filtered if only_filtered else self.items
 
             count = 0
+            modified_items = []  # Traccia gli items modificati per salvare le modifiche manuali
+            
             for item in target_items:
+                original_text = item.text
+                original_translated = item.translated
+                
                 if search_scope == "original":
                     # Cerca e sostituisci nell'originale
                     if case_sensitive:
                         if find_text in item.text:
                             item.text = item.text.replace(find_text, replace_text)
                             count += 1
+                            modified_items.append((item, original_text, None, "text"))
                     else:
                         if find_text.lower() in item.text.lower():
                             import re
                             pattern = re.compile(re.escape(find_text), re.IGNORECASE)
                             item.text = pattern.sub(replace_text, item.text)
                             count += 1
+                            modified_items.append((item, original_text, None, "text"))
                 elif search_scope == "translation":
                     # Cerca e sostituisci nella traduzione
                     if item.translated:
@@ -601,37 +632,75 @@ class RPGMTranslatorApp(ctk.CTk):
                             if find_text in item.translated:
                                 item.translated = item.translated.replace(find_text, replace_text)
                                 count += 1
+                                modified_items.append((item, None, original_translated, "translated"))
                         else:
                             if find_text.lower() in item.translated.lower():
                                 import re
                                 pattern = re.compile(re.escape(find_text), re.IGNORECASE)
                                 item.translated = pattern.sub(replace_text, item.translated)
                                 count += 1
+                                modified_items.append((item, None, original_translated, "translated"))
                 else:  # both
                     # Cerca e sostituisci in entrambi
+                    text_modified = False
+                    translated_modified = False
+                    
                     if case_sensitive:
                         if find_text in item.text:
                             item.text = item.text.replace(find_text, replace_text)
                             count += 1
+                            text_modified = True
                         if item.translated and find_text in item.translated:
                             item.translated = item.translated.replace(find_text, replace_text)
                             count += 1
+                            translated_modified = True
                     else:
                         if find_text.lower() in item.text.lower():
                             import re
                             pattern = re.compile(re.escape(find_text), re.IGNORECASE)
                             item.text = pattern.sub(replace_text, item.text)
                             count += 1
+                            text_modified = True
                         if item.translated and find_text.lower() in item.translated.lower():
                             import re
                             pattern = re.compile(re.escape(find_text), re.IGNORECASE)
                             item.translated = pattern.sub(replace_text, item.translated)
                             count += 1
+                            translated_modified = True
+                    
+                    if text_modified and translated_modified:
+                        modified_items.append((item, original_text, original_translated, "both"))
+                    elif text_modified:
+                        modified_items.append((item, original_text, None, "text"))
+                    elif translated_modified:
+                        modified_items.append((item, None, original_translated, "translated"))
 
             if count > 0:
+                # Salva le modifiche manuali nel tracking
+                if self.extractor:
+                    for item, orig_text, orig_translated, field in modified_items:
+                        if field in ("text", "both") and orig_text is not None:
+                            add_manual_edit(
+                                self.extractor.root,
+                                item.file,
+                                item.key_path,
+                                orig_text,
+                                item.text,
+                                "text"
+                            )
+                        if field in ("translated", "both") and orig_translated is not None:
+                            add_manual_edit(
+                                self.extractor.root,
+                                item.file,
+                                item.key_path,
+                                orig_translated,
+                                item.translated,
+                                "translated"
+                            )
+                
                 self._render_table(self.filtered if only_filtered else self.items)
                 self.btn_save.configure(state="normal")
-                self.btn_export.configure(state="disabled")
+                # Non disabilitare Export Patch - l'utente vuole poter esportare senza salvare
                 messagebox.showinfo("Replace All", f"Replaced in {count} items")
                 dialog.destroy()
             else:
@@ -677,7 +746,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_forge.configure(state="normal")
         self.btn_restore_backup.configure(state="normal")
         self.btn_save.configure(state="disabled")
-        self.btn_export.configure(state="disabled")
+        # Non disabilitare Export Patch - l'utente vuole poter esportare senza salvare
         self._render_table([])
         self.log(f"Selected game: {path}")
         self.log(f"Detected engine: {engine_label}")
@@ -702,7 +771,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_translate.configure(state="disabled")
         self.btn_cancel.configure(state="normal")
         self.btn_save.configure(state="disabled")
-        self.btn_export.configure(state="disabled")
+        # Non disabilitare Export Patch - l'utente vuole poter esportare senza salvare
         self.btn_forge.configure(state="disabled")
         self.btn_restore_backup.configure(state="disabled")
         self.progress.set(0)
@@ -770,6 +839,31 @@ class RPGMTranslatorApp(ctk.CTk):
         if applied:
             self.log(f"Loaded {applied} translations from local cache.")
 
+    def _apply_manual_edits_after_translation(self):
+        """Carica e applica le modifiche manuali dopo la traduzione, con popup di conferma."""
+        if not self.extractor or not self.items:
+            return
+        
+        manual_edits = load_manual_edits(self.extractor.root)
+        if not manual_edits:
+            return
+        
+        # Mostra popup di conferma
+        def show_confirmation():
+            if messagebox.askyesno(
+                "Modifiche Manuali",
+                f"Trovate {len(manual_edits)} modifiche manuali. Vuoi applicarle?"
+            ):
+                applied = apply_manual_edits(self.items, manual_edits)
+                self.log(f"Applied {applied} manual edits.")
+                self._render_table(self.items)
+                self.btn_save.configure(state="normal")
+                # Non disabilitare Export Patch - l'utente vuole poter esportare senza salvare
+            else:
+                self.log("Manual edits not applied.")
+        
+        self.root_after(show_confirmation)
+
     def _analyze_thread(self):
         try:
             self.log(f"Starting analysis of: {self.game_path}")
@@ -800,6 +894,10 @@ class RPGMTranslatorApp(ctk.CTk):
                 self.root_after(self._on_work_done)
                 return
             self._do_translate(targets)
+            
+            # Carica e applica modifiche manuali dopo la traduzione
+            self._apply_manual_edits_after_translation()
+            
             self.root_after(self._on_work_done)
         except Exception as e:
             self._handle_error(e)
@@ -824,6 +922,9 @@ class RPGMTranslatorApp(ctk.CTk):
 
             # Translate only items still missing a translation
             self._do_translate([i for i in self.items if not i.translated], base_progress=0.5, range_progress=0.5)
+
+            # Carica e applica modifiche manuali dopo la traduzione
+            self._apply_manual_edits_after_translation()
 
             self.root_after(lambda: self._set_progress(1.0, self._t("translation_complete",
                                                                    sum(1 for i in self.items if i.translated),
@@ -1025,6 +1126,46 @@ class RPGMTranslatorApp(ctk.CTk):
         msg = self._t("clear_cache_done", removed)
         self.log(msg)
         messagebox.showinfo(self._t("clear_cache_title"), msg)
+
+    def _clear_manual_edits(self):
+        if not messagebox.askyesno("Clear Manual Edits", "This will delete all tracked manual edits. Continue?"):
+            return
+        
+        if self.game_path:
+            try:
+                info = detect_engine(self.game_path)
+                if clear_manual_edits(info["root"]):
+                    self.log("Manual edits cleared.")
+                    messagebox.showinfo("Clear Manual Edits", "Manual edits cleared successfully.")
+                else:
+                    self.log("No manual edits to clear.")
+                    messagebox.showinfo("Clear Manual Edits", "No manual edits to clear.")
+            except Exception as e:
+                self.log(f"Could not clear manual edits: {e}")
+                messagebox.showerror("Error", f"Could not clear manual edits: {e}")
+        else:
+            messagebox.showwarning("Warning", "No game selected.")
+
+    def _delete_selected_row(self):
+        if self._selected_index is None or self._selected_index >= len(self.filtered):
+            return
+        if not messagebox.askyesno("Delete Row", "This will remove the selected row from the translation list. Continue?"):
+            return
+        
+        # Rimuovi l'item dalla lista principale
+        item_to_remove = self.filtered[self._selected_index]
+        if item_to_remove in self.items:
+            self.items.remove(item_to_remove)
+        
+        # Resetta la selezione
+        self._selected_index = None
+        self.edit_text.delete("1.0", "end")
+        self.btn_edit_save.configure(state="disabled")
+        self.btn_delete_row.configure(state="disabled")
+        
+        # Aggiorna la vista
+        self._apply_filter()
+        self.log(f"Row deleted: {item_to_remove.file}")
 
     def _restore_backup(self):
         if not self.game_path:

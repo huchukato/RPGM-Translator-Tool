@@ -112,6 +112,90 @@ def save_local_cache(root: Path, cfg_key: str, items: list[ExtractedString]) -> 
     )
 
 
+def load_manual_edits(root: Path) -> list[dict]:
+    """Carica le modifiche manuali dal file manual_edits.json."""
+    manual_edits_file = root / "manual_edits.json"
+    if not manual_edits_file.exists():
+        return []
+    try:
+        data = json.loads(manual_edits_file.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and "manual_edits" in data:
+            return data["manual_edits"]
+    except Exception:
+        pass
+    return []
+
+
+def save_manual_edits(root: Path, manual_edits: list[dict]) -> None:
+    """Salva le modifiche manuali nel file manual_edits.json."""
+    manual_edits_file = root / "manual_edits.json"
+    manual_edits_file.write_text(
+        json.dumps({"version": "1.0", "manual_edits": manual_edits}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def add_manual_edit(root: Path, file: str, key_path: list[str | int], original_text: str, manual_translation: str, field: str = "translated") -> None:
+    """Aggiunge una modifica manuale al tracking."""
+    manual_edits = load_manual_edits(root)
+    
+    # Rimuovi eventuali modifiche esistenti per lo stesso item
+    manual_edits = [edit for edit in manual_edits if not (
+        edit["file"] == file and 
+        edit["key_path"] == key_path and 
+        edit["field"] == field
+    )]
+    
+    # Aggiungi la nuova modifica
+    from datetime import datetime
+    manual_edits.append({
+        "file": file,
+        "key_path": key_path,
+        "original_text": original_text,
+        "manual_translation": manual_translation,
+        "field": field,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    save_manual_edits(root, manual_edits)
+
+
+def apply_manual_edits(items: list[ExtractedString], manual_edits: list[dict]) -> int:
+    """Applica le modifiche manuali agli items corrispondenti. Restituisce il numero di modifiche applicate."""
+    applied_count = 0
+    
+    # Crea un dizionario per lookup veloce degli items
+    items_dict = {}
+    for item in items:
+        key = f"{item.file}:{'.'.join(str(k) for k in item.key_path)}"
+        items_dict[key] = item
+    
+    for edit in manual_edits:
+        key = f"{edit['file']}:{'.'.join(str(k) for k in edit['key_path'])}"
+        if key in items_dict:
+            item = items_dict[key]
+            if edit["field"] == "text":
+                item.text = edit["manual_translation"]
+                applied_count += 1
+            elif edit["field"] == "translated":
+                item.translated = edit["manual_translation"]
+                applied_count += 1
+    
+    return applied_count
+
+
+def clear_manual_edits(root: Path) -> bool:
+    """Cancella il file delle modifiche manuali. Restituisce True se cancellato con successo."""
+    manual_edits_file = root / "manual_edits.json"
+    if manual_edits_file.exists():
+        try:
+            manual_edits_file.unlink()
+            return True
+        except Exception:
+            return False
+    return False
+
+
 def patch_data_files(
     root: Path,
     items: list[ExtractedString],

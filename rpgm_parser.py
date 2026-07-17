@@ -334,13 +334,21 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             literal = m.group(1)
             # Controlla se il letterale è un argomento diretto di $gameVariables.setValue o $gameVariables.value
             if "$gameVariables.setValue" in current_code or "$gameVariables.value" in current_code:
-                # Se è vicino alla chiamata di funzione, controlla se è un nome breve (probabilmente NPC)
+                # Se è vicino alla chiamata di funzione, controlla se è value 21 (solo questo deve essere tradotto)
                 if re.search(r'\$gameVariables\.(setValue|value)\s*\([^)]*$', current_code):
-                    # Salta solo se è una singola parola senza spazi (probabilmente un nome NPC)
-                    if " " not in literal:
+                    # Controlla se il primo parametro è 21 (variabile contenente dialoghi traducibili)
+                    # Il regex deve catturare il numero dopo la parentesi aperta
+                    if not re.search(r'\$gameVariables\.(setValue|value)\s*\(\s*21\s*[,\)]', current_code):
+                        # Salta la traduzione per tutti i gameVariables tranne value 21
                         current_code += m.group(0)
                         prev_end = m.end()
                         continue
+                    # Per value 21, procedi con la logica normale di traduzione
+            # Salta commenti JavaScript (//Upset, //Joyful, etc.)
+            if literal.strip().startswith("//"):
+                current_code += m.group(0)
+                prev_end = m.end()
+                continue
             # Prima controlla se è un prefisso RPG Maker con separatore speciale
             rpg_maker_match = rpg_maker_prefix_re.match(literal)
             if rpg_maker_match:
