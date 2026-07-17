@@ -256,8 +256,14 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         # probabilmente è codice o placeholder, non testo visibile.
         if literal.count("{") != literal.count("}"):
             return False
-        if any(c in literal for c in "$[]<>+=\\/"):
+        # Permetti < e > solo quando sono parte di prefissi di dialogo RPG Maker (es. NPCShCl<.)
+        if any(c in literal for c in "$[]+=\\/"):
             return False
+        # Controlla se < e > sono usati come prefissi di dialogo (seguiti da punto o all'inizio)
+        if "<" in literal or ">" in literal:
+            # Permetti solo se il pattern corrisponde a un prefisso di dialogo RPG Maker
+            if not re.search(r'^[A-Za-z0-9]+[<>]\.', literal):
+                return False
         return True
 
     def add_script_text(script: str, keys: list[str | int]) -> bool:
