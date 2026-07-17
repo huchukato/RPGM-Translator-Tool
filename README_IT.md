@@ -3,7 +3,7 @@
 ![RPGM-Translator Logo](logo_512.png)
 
 ![Python](https://img.shields.io/badge/python-3.9+-06b6d4.svg)
-![Version](https://img.shields.io/badge/version-1.1.0-10b981.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-10b981.svg)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-7c3aed.svg)
 ![License](https://img.shields.io/badge/license-As--Is-f59e0b.svg)
 
@@ -23,13 +23,21 @@ Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di *
   - 🛡️ `Items.json`, `Weapons.json`, `Armors.json`, `Skills.json`, `States.json`, `Enemies.json`, `Actors.json`, `Classes.json`
   - 🔌 `js/plugins.js` (testo traducibile dei plugin)
 - 🌍 Backend di traduzione: **Google Turbo**, **Bing Ultra**, **OpenRouter**, **Llama locale**.
-- 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte) e ricerca live per originale, traduzione o entrambi.
+- 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte), filtro file e ricerca live per originale, traduzione o entrambi.
+- 🔄 **Sostituisci Tutto** — cerca e sostituisci parole specifiche in tutte le traduzioni o solo negli elementi filtrati.
 - 💾 Patch in-place con un unico backup originale protetto di `data`.
 - 🗂️ Cache globale e locale delle traduzioni, cancellabile dalla GUI.
 - 📦 Esportazione di `www/data` tradotte come patch.
 
 ## 🆕 Novità
 
+- 🎯 **Gestione escape code basata su delimitatori** — preserva il posizionamento esatto degli escape code (colori, icone) trattandoli come delimitatori e traducendo solo i segmenti di testo tra di essi.
+- ⚡ **Traduzione segmenti ottimizzata** — elabora in batch tutti i segmenti di testo per prestazioni migliorate.
+- 🔧 **Riconoscimento prefissi RPG Maker migliorato** — supporta caratteri speciali consecutivi multipli nei prefissi (es. `<<`, `>>`).
+- 👤 **Preservazione nomi personaggi nei dialoghi** — sostituisce i nomi dei personaggi con placeholder prima della traduzione e li ripristina dopo, prevenendo traduzioni indesiderate dei nomi.
+- 🔍 **Filtro file** — filtra le stringhe per file di origine (es. Items.json, Armor.json) per una navigazione più facile.
+- 🔄 **Sostituisci Tutto** — cerca e sostituisci parole specifiche in tutte le traduzioni o solo negli elementi filtrati, con opzione case-sensitive.
+- 🐛 **Fix traduzione testo breve** — workaround per testo molto breve non tradotto da Google a causa di caratteri speciali Unicode.
 - **Riutilizzo cache migliorato** — la cache ora funziona tra diversi backend di traduzione e dopo aver ri-analizzato giochi già tradotti.
 - **Visualizzazione GUI pulita** — i token script sono nascosti nella tabella di traduzione e nell'editor per una migliore leggibilità.
 - **Ricerca stringhe** — filtra la tabella in tempo reale per testo originale, traduzione o entrambi.

@@ -6,6 +6,13 @@
 
 ## 🆕 Latest additions
 
+- 🎯 **Delimiter-based escape code handling** — preserves exact positioning of escape codes (colors, icons) by treating them as delimiters and translating only text segments between them.
+- ⚡ **Optimized segment translation** — batch processes all text segments for improved performance.
+- 🔧 **Enhanced RPG Maker prefix recognition** — supports multiple consecutive special characters in prefixes (e.g., `<<`, `>>`).
+- 👤 **Character name preservation in dialogues** — replaces character names with placeholders before translation and restores them after, preventing unwanted name translations.
+- 🔍 **File filter** — filter strings by source file (e.g., Items.json, Armor.json) for easier navigation.
+- 🔄 **Replace All** — find and replace specific words across all translations or filtered items only, with case-sensitive option.
+- 🐛 **Short text translation fix** — workaround for very short text not being translated by Google due to Unicode special characters.
 - **Clear cache** button — delete the global and local translation caches from the GUI.
 - **Script literal translation** — translatable strings inside JavaScript event commands (e.g., Oracle tips in `CommonEvents.json`) are now extracted and translated while preserving the surrounding code.
 - **RPG Maker dialogue prefix handling** — general logic to handle RPG Maker dialogue prefixes with special separators (`<`, `>`, `}`, `{`, `^`) while translating only the dialogue content.
