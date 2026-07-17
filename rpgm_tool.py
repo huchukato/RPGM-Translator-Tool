@@ -536,7 +536,11 @@ class RPGMTranslatorApp(ctk.CTk):
         if not self.items:
             return
         files = sorted(set(item.file for item in self.items))
-        self.file_filter_combo.configure(values=["All files"] + files)
+        new_values = ["All files"] + files
+        self.file_filter_combo.configure(values=new_values)
+        # Resetta il valore selezionato a "All files" per evitare problemi con valori non più validi
+        self.file_filter_var.set("All files")
+        self.file_filter_combo.update()
 
     def _open_replace_dialog(self):
         """Apre il dialogo per Replace All."""
