@@ -577,12 +577,6 @@ class RPGMTranslatorApp(ctk.CTk):
             # Scegli gli items su cui applicare
             target_items = self.filtered if only_filtered else self.items
 
-            # Debug: mostra quanti items stanno sendo controllati
-            print(f"DEBUG: Total items: {len(target_items)}, Search scope: {search_scope}")
-            if target_items:
-                print(f"DEBUG: First item text: '{target_items[0].text[:50]}...'")
-                print(f"DEBUG: First item translated: '{target_items[0].translated[:50] if target_items[0].translated else 'empty'}...'")
-
             count = 0
             for item in target_items:
                 if search_scope == "original":
@@ -631,7 +625,6 @@ class RPGMTranslatorApp(ctk.CTk):
                             item.translated = pattern.sub(replace_text, item.translated)
                             count += 1
 
-            print(f"DEBUG: Replacements made: {count}")
             if count > 0:
                 self._render_table(self.filtered if only_filtered else self.items)
                 self.btn_save.configure(state="normal")
