@@ -125,7 +125,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.translator: Translator | None = None
         self._page = 0
         self._page_size = 100
-        self._selected_index: int | None = None
+        self._selected_indices: set[int] = set()
         self._analysis_done = False
 
         self._build_ui()
@@ -433,7 +433,7 @@ class RPGMTranslatorApp(ctk.CTk):
     def _render_table(self, items: list[ExtractedString]):
         self.filtered = items
         self._page = 0
-        self._selected_index = None
+        self._selected_indices.clear()
         self._render_page()
 
     def _render_page(self):
@@ -448,11 +448,20 @@ class RPGMTranslatorApp(ctk.CTk):
         for i, item in enumerate(page_items):
             abs_i = start + i
             bg = COLOR_ROW_EVEN if abs_i % 2 == 0 else COLOR_ROW_ODD
-            if self._selected_index is not None and abs_i == self._selected_index:
+            if abs_i in self._selected_indices:
                 bg = COLOR_SELECTED
             row = ctk.CTkFrame(self.table_frame, fg_color=bg, height=28)
             row.pack(fill="x", pady=(0, 1))
             row.pack_propagate(False)
+
+            # Checkbox per selezione multipla
+            checkbox_var = ctk.StringVar(value="off" if abs_i not in self._selected_indices else "on")
+            checkbox = ctk.CTkCheckBox(row, text="", variable=checkbox_var, onvalue="on", offvalue="off",
+                                       command=lambda idx=abs_i, var=checkbox_var: self._on_checkbox_toggle(idx, var))
+            checkbox.pack(side="left", padx=4, pady=2)
+            # Imposta lo stato iniziale del checkbox
+            if abs_i in self._selected_indices:
+                checkbox_var.set("on")
 
             cols_w = [50, 90, 420, 420, 180]
             vals = [
@@ -477,8 +486,17 @@ class RPGMTranslatorApp(ctk.CTk):
         total_pages = max(1, (len(items) + self._page_size - 1) // self._page_size)
         self.page_label.configure(text=f"Page {self._page + 1} / {total_pages}  ({len(items)} strings)")
 
+    def _on_checkbox_toggle(self, abs_i: int, checkbox_var: ctk.StringVar):
+        if checkbox_var.get() == "on":
+            self._selected_indices.add(abs_i)
+        else:
+            self._selected_indices.discard(abs_i)
+        self._render_page()
+        self.btn_delete_row.configure(state="normal" if self._selected_indices else "disabled")
+
     def _on_row_click(self, abs_i: int, item: ExtractedString):
-        self._selected_index = abs_i
+        self._selected_indices.clear()
+        self._selected_indices.add(abs_i)
         self._render_page()
         self.edit_text.configure(state="normal")
         self.edit_text.delete("1.0", "end")
@@ -488,16 +506,20 @@ class RPGMTranslatorApp(ctk.CTk):
         self.btn_delete_row.configure(state="normal")
 
     def _save_edit(self):
-        if self._selected_index is None or self._selected_index >= len(self.filtered):
+        if not self._selected_indices:
             return
-        item = self.filtered[self._selected_index]
+        # Prendi il primo indice selezionato per l'editing singolo
+        selected_index = next(iter(self._selected_indices))
+        if selected_index >= len(self.filtered):
+            return
+        item = self.filtered[selected_index]
         edited_text = self.edit_text.get("1.0", "end-1c")
         # Reinserisci i token se l'item ne ha
         if item.has_script_tokens and item.token_map:
             item.translated = restore_script_tokens(edited_text, item.token_map)
         else:
             item.translated = edited_text
-        
+
         # Salva la modifica manuale nel tracking
         if self.extractor:
             add_manual_edit(
@@ -508,7 +530,7 @@ class RPGMTranslatorApp(ctk.CTk):
                 item.translated,
                 "translated"
             )
-        
+
         self._render_page()
         self.btn_save.configure(state="normal")
         # Non disabilitare Export Patch - l'utente vuole poter esportare senza salvare
@@ -1147,25 +1169,34 @@ class RPGMTranslatorApp(ctk.CTk):
             messagebox.showwarning("Warning", "No game selected.")
 
     def _delete_selected_row(self):
-        if self._selected_index is None or self._selected_index >= len(self.filtered):
+        if not self._selected_indices:
             return
-        if not messagebox.askyesno("Delete Row", "This will remove the selected row from the translation list. Continue?"):
+        count = len(self._selected_indices)
+        if not messagebox.askyesno("Delete Rows", f"This will remove {count} selected row(s) from the translation list. Continue?"):
             return
-        
-        # Rimuovi l'item dalla lista principale
-        item_to_remove = self.filtered[self._selected_index]
-        if item_to_remove in self.items:
-            self.items.remove(item_to_remove)
-        
+
+        # Rimuovi gli item dalla lista principale (dall'ultimo al primo per mantenere gli indici validi)
+        indices_to_remove = sorted(self._selected_indices, reverse=True)
+        for idx in indices_to_remove:
+            if idx < len(self.filtered):
+                item_to_remove = self.filtered[idx]
+                if item_to_remove in self.items:
+                    self.items.remove(item_to_remove)
+
         # Resetta la selezione
-        self._selected_index = None
+        self._selected_indices.clear()
         self.edit_text.delete("1.0", "end")
         self.btn_edit_save.configure(state="disabled")
         self.btn_delete_row.configure(state="disabled")
-        
-        # Aggiorna la vista
+
+        # Aggiorna la vista mantenendo la pagina corrente
         self._apply_filter()
-        self.log(f"Row deleted: {item_to_remove.file}")
+        # Se la pagina corrente è vuota dopo la cancellazione, vai alla pagina precedente
+        total_pages = max(1, (len(self.filtered) + self._page_size - 1) // self._page_size)
+        if self._page >= total_pages:
+            self._page = max(0, total_pages - 1)
+        self._render_page()
+        self.log(f"Deleted {count} row(s)")
 
     def _restore_backup(self):
         if not self.game_path:
