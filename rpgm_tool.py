@@ -323,8 +323,8 @@ class RPGMTranslatorApp(ctk.CTk):
 
         ctk.CTkLabel(search_row, text="File:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(12, 4))
         self.file_filter_var = ctk.StringVar(value="All files")
-        self.file_filter_combo = ctk.CTkComboBox(search_row, values=["All files"], width=200,
-                                                 variable=self.file_filter_var, command=self._on_file_filter_change)
+        self.file_filter_combo = ctk.CTkOptionMenu(search_row, values=["All files"], width=200,
+                                                   variable=self.file_filter_var, command=self._on_file_filter_change)
         self.file_filter_combo.pack(side="left", padx=4, pady=4)
 
         # Header
@@ -546,7 +546,6 @@ class RPGMTranslatorApp(ctk.CTk):
         self.file_filter_combo.configure(values=new_values)
         # Resetta il valore selezionato a "All files" per evitare problemi con valori non più validi
         self.file_filter_var.set("All files")
-        self.file_filter_combo.update()
 
     def _open_replace_dialog(self):
         """Apre il dialogo per Replace All."""
