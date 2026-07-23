@@ -693,7 +693,7 @@ class Translator:
                 pattern = r'\b' + re.escape(name) + r'\b'
                 def name_rep(m):
                     nonlocal counter
-                    k = f"@@NAME{counter}@@"; mapping[k] = m.group(0); counter += 1; return k
+                    k = f"@@RNT{counter}@@"; mapping[k] = m.group(0); counter += 1; return k
                 protected = re.sub(pattern, name_rep, protected, flags=re.IGNORECASE)
         
         return protected, mapping
