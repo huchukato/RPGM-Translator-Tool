@@ -50,6 +50,7 @@ COLOR_SUBTEXT = "#a78bfa"
 COLOR_ROW_EVEN = "#0c0a12"
 COLOR_ROW_ODD = "#18122b"
 COLOR_SELECTED = "#0e7490"
+COLOR_MANUAL = "#facc15"
 
 APP_TITLE = "RPGM Translator"
 VERSION = "1.1.0"
@@ -126,6 +127,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self._page = 0
         self._page_size = 100
         self._selected_indices: set[int] = set()
+        self._manual_edit_keys: set[tuple[str, tuple[Any, ...]]] = set()
         self._analysis_done = False
 
         self._build_ui()
@@ -326,6 +328,12 @@ class RPGMTranslatorApp(ctk.CTk):
                                                    variable=self.search_scope_var, command=self._on_search_scope_change)
         self.search_scope_combo.pack(side="left", padx=4, pady=4)
 
+        ctk.CTkLabel(search_row, text="File:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(8, 4))
+        self.file_filter_var = ctk.StringVar(value="All")
+        self.file_filter_combo = ctk.CTkComboBox(search_row, values=["All"], width=150,
+                                                 variable=self.file_filter_var, command=self._on_file_filter_change)
+        self.file_filter_combo.pack(side="left", padx=4, pady=4)
+
         # Select All checkbox
         self.select_all_var = ctk.StringVar(value="off")
         self.select_all_checkbox = ctk.CTkCheckBox(search_row, text="Select All", variable=self.select_all_var,
@@ -441,6 +449,20 @@ class RPGMTranslatorApp(ctk.CTk):
         self.filtered = items
         self._page = 0
         self._selected_indices.clear()
+        self._manual_edit_keys = set()
+        if self.extractor:
+            try:
+                for edit in load_manual_edits(self.extractor.root):
+                    self._manual_edit_keys.add((edit["file"], tuple(edit["key_path"])))
+            except Exception:
+                pass
+        all_files = sorted({i.file for i in self.items})
+        current_file = self.file_filter_var.get()
+        values = ["All"] + all_files
+        if current_file not in values:
+            current_file = "All"
+            self.file_filter_var.set("All")
+        self.file_filter_combo.configure(values=values)
         self._render_page()
 
     def _render_page(self):
@@ -457,6 +479,7 @@ class RPGMTranslatorApp(ctk.CTk):
             bg = COLOR_ROW_EVEN if abs_i % 2 == 0 else COLOR_ROW_ODD
             if abs_i in self._selected_indices:
                 bg = COLOR_SELECTED
+            manual = (item.file, tuple(item.key_path)) in self._manual_edit_keys
             row = ctk.CTkFrame(self.table_frame, fg_color=bg, height=28)
             row.pack(fill="x", pady=(0, 1))
             row.pack_propagate(False)
@@ -478,9 +501,10 @@ class RPGMTranslatorApp(ctk.CTk):
                 strip_script_tokens(item.translated or "")[:70],
                 item.file,
             ]
+            text_color = COLOR_MANUAL if manual else (COLOR_TEXT if item.translated else COLOR_SUBTEXT)
             for val, w in zip(vals, cols_w):
                 lbl = ctk.CTkLabel(row, text=val, width=w, anchor="w",
-                                   text_color=COLOR_TEXT if item.translated else COLOR_SUBTEXT,
+                                   text_color=text_color,
                                    font=ctk.CTkFont(size=11))
                 lbl.pack(side="left", padx=4, pady=2)
 
@@ -584,9 +608,17 @@ class RPGMTranslatorApp(ctk.CTk):
                     return query in translation
                 return query in original or query in translation
             visible = [item for item in visible if matches(item)]
+
+        file_filter = self.file_filter_var.get()
+        if file_filter and file_filter != "All":
+            visible = [item for item in visible if item.file == file_filter]
+
         self._render_table(visible)
 
     def _on_search_scope_change(self, _value: str):
+        self._apply_filter()
+
+    def _on_file_filter_change(self, _value: str):
         self._apply_filter()
 
 

@@ -332,7 +332,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             return False
         return True
 
-    def add_script_text(script: str, keys: list[str | int]) -> bool:
+    def add_script_text(script: str, keys: list[str | int], *, skip_single_word: bool = False) -> bool:
         """Estrae stringhe letterali traducibili da un comando Script (code 355/655/122/357)."""
         str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
         dialogue_prefix_re = re.compile(r"^([A-Za-z][A-Za-z0-9#^>{}]*\.)")
@@ -345,6 +345,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         for m in str_re.finditer(script):
             current_code += script[prev_end:m.start()]
             literal = m.group(1)
+            # Per code 122 salta valori variabili composti da una sola parola
+            # (es. "medium" per la velocità del video) e traduci solo frasi.
+            if skip_single_word and " " not in literal:
+                current_code += m.group(0)
+                prev_end = m.end()
+                continue
             # Controlla se il letterale è un argomento diretto di $gameVariables.setValue o $gameVariables.value
             if "$gameVariables.setValue" in current_code or "$gameVariables.value" in current_code:
                 # Se è vicino alla chiamata di funzione, controlla se è value 21 (solo questo deve essere tradotto)
@@ -500,10 +506,10 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                     # all'interno sono spesso valori JSON/proprietà interne (es.
                     # "Center", "Normal", "left"). Tradurle rompe i plugin.
                     return
-                # Salta il codice 122 (Control Variables): le stringhe nei
-                # parametri sono valori/espressioni per variabili e non testo
-                # visibile; tradurle rompe variabili come 65 (volume) e 66 (speed).
+                # Per il codice 122 (Control Variables) traduci solo stringhe che
+                # sembrano frasi, saltando valori singoli come "medium" (var 66).
                 if code == 122:
+                    add_script_text(val, keys, skip_single_word=True)
                     return
                 # Per tutti gli altri codici evento estrai solo le
                 # stringhe letterali tra virgolette.
