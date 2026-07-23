@@ -332,7 +332,7 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
             return False
         return True
 
-    def add_script_text(script: str, keys: list[str | int]) -> bool:
+    def add_script_text(script: str, keys: list[str | int], *, skip_single_word: bool = False) -> bool:
         """Estrae stringhe letterali traducibili da un comando Script (code 355/655/122/357)."""
         str_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
         dialogue_prefix_re = re.compile(r"^([A-Za-z][A-Za-z0-9#^>{}]*\.)")
@@ -345,6 +345,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
         for m in str_re.finditer(script):
             current_code += script[prev_end:m.start()]
             literal = m.group(1)
+            # Per code 122 salta valori variabili composti da una sola parola
+            # (es. "medium" per la velocità del video) e traduci solo frasi.
+            if skip_single_word and " " not in literal:
+                current_code += m.group(0)
+                prev_end = m.end()
+                continue
             # Controlla se il letterale è un argomento diretto di $gameVariables.setValue o $gameVariables.value
             if "$gameVariables.setValue" in current_code or "$gameVariables.value" in current_code:
                 # Se è vicino alla chiamata di funzione, controlla se è value 21 (solo questo deve essere tradotto)
@@ -442,22 +448,6 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                 if file_name in ("Tilesets.json", "Animations.json", "Troops.json", "CommonEvents.json"):
                     return
                 if file_name.startswith("Map") and file_name.endswith(".json"):
-                    # Estrai solo il nome proprio dell'evento, non altri campi 'name' audio/asset.
-                    if not (len(keys) >= 3 and keys[-3] == "events" and isinstance(keys[-2], int)):
-                        return
-                    event = get_value_at_path(data, keys[:-1])
-                    if not isinstance(event, dict):
-                        return
-                    note = event.get("note", "")
-                    if "<charAnims>" not in note and "charAnimSetup" not in note:
-                        return
-                    name_val = val.strip()
-                    # Salta nomi interni/placeholder
-                    if re.fullmatch(r"EV\d+", name_val, re.IGNORECASE):
-                        return
-                    if name_val.lower() in {"hit", "marker", "potion", "interview"}:
-                        return
-                    add_text(val, "npc_name", keys)
                     return
                 if any(k in ASSET_CONTEXT_KEYS for k in keys[:-1]):
                     return
@@ -516,13 +506,10 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                     # all'interno sono spesso valori JSON/proprietà interne (es.
                     # "Center", "Normal", "left"). Tradurle rompe i plugin.
                     return
-                # Per il codice 122 (Control Variables) traduci i valori stringa,
-                # ma proteggi le variabili interne 65 (volume) e 66 (playback speed).
+                # Per il codice 122 (Control Variables) traduci solo stringhe che
+                # sembrano frasi, saltando valori singoli come "medium" (var 66).
                 if code == 122:
-                    params = cmd.get("parameters", [])
-                    if len(params) >= 2 and (params[0] in (65, 66) or params[1] in (65, 66)):
-                        return
-                    add_script_text(val, keys)
+                    add_script_text(val, keys, skip_single_word=True)
                     return
                 # Per tutti gli altri codici evento estrai solo le
                 # stringhe letterali tra virgolette.
