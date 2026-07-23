@@ -500,7 +500,12 @@ def parse_data_file(file_path: Path, file_name: str, idx_ref: list[int]) -> list
                     # all'interno sono spesso valori JSON/proprietà interne (es.
                     # "Center", "Normal", "left"). Tradurle rompe i plugin.
                     return
-                # Per tutti gli altri codici evento (es. 122) estrai solo le
+                # Salta il codice 122 (Control Variables): le stringhe nei
+                # parametri sono valori/espressioni per variabili e non testo
+                # visibile; tradurle rompe variabili come 65 (volume) e 66 (speed).
+                if code == 122:
+                    return
+                # Per tutti gli altri codici evento estrai solo le
                 # stringhe letterali tra virgolette.
                 if isinstance(code, int):
                     add_script_text(val, keys)
