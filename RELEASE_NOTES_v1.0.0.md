@@ -1,10 +1,15 @@
-# Release Notes — RPGM-Translator v1.0.0
+# Release Notes — RPGM-Translator v1.1.0
 
 🎉 **First stable release of RPGM-Translator**, a GUI tool to automatically translate **RPG Maker MV/MZ** games.
 
 ---
 
-## 🆕 Latest additions
+## 🆕 v1.1.0 additions
+
+- 🆕 **Edited filter** — show only strings that have been manually edited and saved in `manual_edits.json`.
+- 🔄 **Reset translation** — the `Delete Row` button has been replaced with `Reset`: it clears the manual translation for selected rows, removes the entry from `manual_edits.json`, and leaves the original string unchanged.
+
+## ✨ v1.0.0 additions
 
 - 🎯 **Delimiter-based escape code handling** — preserves exact positioning of escape codes (colors, icons) by treating them as delimiters and translating only text segments between them.
 - ⚡ **Optimized segment translation** — batch processes all text segments for improved performance.

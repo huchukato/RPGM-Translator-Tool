@@ -3,7 +3,7 @@
 ![RPGM-Translator Logo](img/logo_512.png)
 
 ![Python](https://img.shields.io/badge/python-3.9+-06b6d4.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-10b981.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-10b981.svg)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-7c3aed.svg)
 ![License](https://img.shields.io/badge/license-As--Is-f59e0b.svg)
 
@@ -23,7 +23,7 @@ Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di *
   - 🛡️ `Items.json`, `Weapons.json`, `Armors.json`, `Skills.json`, `States.json`, `Enemies.json`, `Actors.json`, `Classes.json`
   - 🔌 `js/plugins.js` (testo traducibile dei plugin)
 - 🌍 Backend di traduzione: **Google Turbo**, **Bing Ultra**, **OpenRouter**, **Llama locale**.
-- 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte), filtro file e ricerca live per originale, traduzione o entrambi.
+- 🔎 Tabella di traduzione modificabile con filtri (Tutte / Tradotte / Non tradotte / Modificate), filtro file e ricerca live per originale, traduzione o entrambi.
 - 🔄 **Sostituisci Tutto** — cerca e sostituisci parole specifiche in tutte le traduzioni o solo negli elementi filtrati.
 - 💾 Patch in-place con un unico backup originale protetto di `data`.
 - 🗂️ Cache globale e locale delle traduzioni, cancellabile dalla GUI.
@@ -31,6 +31,8 @@ Ispirato alla logica di **Ren'Py Translator** e allo stile dell'interfaccia di *
 
 ## 🆕 Novità
 
+- 🆕 **Filtro Modificate** — mostra solo le stringhe modificate manualmente e salvate in `manual_edits.json`.
+- 🔄 **Reset traduzione** — il vecchio pulsante **Delete Row** è ora **Reset**: cancella la traduzione manuale per le righe selezionate, rimuove l'entry da `manual_edits.json` e lascia la stringa originale invariata.
 - 🎯 **Gestione escape code basata su delimitatori** — preserva il posizionamento esatto degli escape code (colori, icone) trattandoli come delimitatori e traducendo solo i segmenti di testo tra di essi.
 - ⚡ **Traduzione segmenti ottimizzata** — elabora in batch tutti i segmenti di testo per prestazioni migliorate.
 - 🔧 **Riconoscimento prefissi RPG Maker migliorato** — supporta caratteri speciali consecutivi multipli nei prefissi (es. `<<`, `>>`).

@@ -3,7 +3,7 @@
 ![RPGM-Translator Logo](img/logo_512.png)
 
 ![Python](https://img.shields.io/badge/python-3.9+-06b6d4.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-10b981.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-10b981.svg)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-7c3aed.svg)
 ![License](https://img.shields.io/badge/license-As--Is-f59e0b.svg)
 
@@ -23,7 +23,7 @@ Inspired by the logic of **Ren'Py Translator** and the interface style of **WTFo
   - 🛡️ `Items.json`, `Weapons.json`, `Armors.json`, `Skills.json`, `States.json`, `Enemies.json`, `Actors.json`, `Classes.json`
   - 🔌 `js/plugins.js` (translatable plugin text)
 - 🌍 Translation backends: **Google Turbo**, **Bing Ultra**, **OpenRouter**, **Llama local**.
-- 🔎 Editable translation table with filters (All / Translated / Untranslated), file filter, and live search by original text, translation, or both.
+- 🔎 Editable translation table with filters (All / Translated / Untranslated / Edited), file filter, and live search by original text, translation, or both.
 - 🔄 **Replace All** — find and replace specific words across all translations or filtered items only.
 - 💾 In-place patching with one protected original `data` backup.
 - 🗂️ Global and local translation cache, with a one-click cleanup option.
@@ -31,6 +31,8 @@ Inspired by the logic of **Ren'Py Translator** and the interface style of **WTFo
 
 ## 🆕 Latest
 
+- 🆕 **Edited filter** — show only strings that have been manually edited and saved in `manual_edits.json`.
+- 🔄 **Reset translation** — the old **Delete Row** button is now **Reset**: it clears the manual translation for selected rows, removes the entry from `manual_edits.json`, and leaves the original string unchanged.
 - 🎯 **Delimiter-based escape code handling** — preserves exact positioning of escape codes (colors, icons) by treating them as delimiters and translating only text segments between them.
 - ⚡ **Optimized segment translation** — batch processes all text segments for improved performance.
 - 🔧 **Enhanced RPG Maker prefix recognition** — supports multiple consecutive special characters in prefixes (e.g., `<<`, `>>`).
