@@ -160,6 +160,20 @@ def add_manual_edit(root: Path, file: str, key_path: list[str | int], original_t
     save_manual_edits(root, manual_edits)
 
 
+def remove_manual_edit(root: Path, file: str, key_path: list[str | int], field: str = "translated") -> None:
+    """Rimuove una modifica manuale dal tracking, se presente."""
+    manual_edits = load_manual_edits(root)
+    manual_edits = [
+        edit for edit in manual_edits
+        if not (
+            edit["file"] == file
+            and edit["key_path"] == key_path
+            and edit["field"] == field
+        )
+    ]
+    save_manual_edits(root, manual_edits)
+
+
 def apply_manual_edits(items: list[ExtractedString], manual_edits: list[dict]) -> int:
     """Applica le modifiche manuali agli items corrispondenti. Restituisce il numero di modifiche applicate."""
     applied_count = 0

@@ -29,7 +29,7 @@ from rpgm_settings import (
 )
 from rpgm_translator import OPENROUTER_FREE_MODELS, Translator, TranslatorConfig, TranslationError
 from rpgm_writer import (
-    WriteError, add_manual_edit, apply_manual_edits, backup_data_dir, clear_manual_edits, export_patch, load_local_cache, load_manual_edits, patch_data_files, restore_data_backup, save_local_cache,
+    WriteError, add_manual_edit, apply_manual_edits, backup_data_dir, clear_manual_edits, export_patch, load_local_cache, load_manual_edits, patch_data_files, remove_manual_edit, restore_data_backup, save_local_cache,
 )
 
 ctk.set_appearance_mode("dark")
@@ -186,7 +186,7 @@ class RPGMTranslatorApp(ctk.CTk):
         ctk.CTkLabel(ctrl, text="Filter:", text_color=COLOR_SUBTEXT).pack(side="left", padx=(12, 4))
         self.filter_var = ctk.StringVar(value="all")
         for val, key in [("all", "filter_all"), ("translated", "filter_translated"),
-                         ("untranslated", "filter_untranslated")]:
+                         ("untranslated", "filter_untranslated"), ("edited", "filter_edited")]:
             rb = ctk.CTkRadioButton(ctrl, text=t(self.current_lang, key), variable=self.filter_var,
                                     value=val, command=self._apply_filter)
             rb.pack(side="left", padx=4)
@@ -341,7 +341,7 @@ class RPGMTranslatorApp(ctk.CTk):
         self.select_all_checkbox.pack(side="left", padx=(8, 4), pady=4)
 
         # Delete Row button
-        self.btn_delete_row = ctk.CTkButton(search_row, text="Delete Row",
+        self.btn_delete_row = ctk.CTkButton(search_row, text="Reset",
                                             fg_color="#dc2626", hover_color="#b91c1c",
                                             text_color="white", width=100, command=self._delete_selected_row)
         self.btn_delete_row.pack(side="left", padx=(4, 8), pady=4)
@@ -593,6 +593,8 @@ class RPGMTranslatorApp(ctk.CTk):
             visible = [i for i in self.items if i.translated]
         elif f == "untranslated":
             visible = [i for i in self.items if not i.translated]
+        elif f == "edited":
+            visible = [i for i in self.items if (i.file, tuple(i.key_path)) in self._manual_edit_keys]
         else:
             visible = self.items
 
@@ -1221,16 +1223,25 @@ class RPGMTranslatorApp(ctk.CTk):
         if not self._selected_indices:
             return
         count = len(self._selected_indices)
-        if not messagebox.askyesno("Delete Rows", f"This will remove {count} selected row(s) from the translation list. Continue?"):
+        if not messagebox.askyesno("Reset Translations", f"This will reset {count} selected translation(s) to the original text. Continue?"):
             return
 
-        # Rimuovi gli item dalla lista principale (dall'ultimo al primo per mantenere gli indici validi)
-        indices_to_remove = sorted(self._selected_indices, reverse=True)
-        for idx in indices_to_remove:
-            if idx < len(self.filtered):
-                item_to_remove = self.filtered[idx]
-                if item_to_remove in self.items:
-                    self.items.remove(item_to_remove)
+        # Resetta le traduzioni selezionate e rimuovi le modifiche manuali
+        if self.extractor:
+            for idx in self._selected_indices:
+                if idx < len(self.filtered):
+                    item = self.filtered[idx]
+                    item.translated = None
+                    remove_manual_edit(self.extractor.root, item.file, item.key_path, "translated")
+
+        # Aggiorna il set delle chiavi modificate manualmente
+        if self.extractor:
+            self._manual_edit_keys = set()
+            try:
+                for edit in load_manual_edits(self.extractor.root):
+                    self._manual_edit_keys.add((edit["file"], tuple(edit["key_path"])))
+            except Exception:
+                pass
 
         # Resetta la selezione
         self._selected_indices.clear()
@@ -1240,12 +1251,12 @@ class RPGMTranslatorApp(ctk.CTk):
 
         # Aggiorna la vista mantenendo la pagina corrente
         self._apply_filter()
-        # Se la pagina corrente è vuota dopo la cancellazione, vai alla pagina precedente
+        # Se la pagina corrente è vuota dopo il reset, vai alla pagina precedente
         total_pages = max(1, (len(self.filtered) + self._page_size - 1) // self._page_size)
         if self._page >= total_pages:
             self._page = max(0, total_pages - 1)
         self._render_page()
-        self.log(f"Deleted {count} row(s)")
+        self.log(f"Reset {count} translation(s)")
 
     def _restore_backup(self):
         if not self.game_path:
