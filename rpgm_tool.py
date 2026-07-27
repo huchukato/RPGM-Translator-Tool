@@ -21,6 +21,7 @@ from tkinter import filedialog, messagebox
 from rpgm_detector import detect_engine, DetectionError
 from rpgm_extractor import RPGMExtractor
 from rpgm_forge import ensure_forge_js, install_forge
+from rpgm_splash import install_splash
 from rpgm_parser import ExtractedString, strip_script_tokens, restore_script_tokens
 from rpgm_translator import extract_character_names
 from rpgm_settings import (
@@ -1123,6 +1124,8 @@ class RPGMTranslatorApp(ctk.CTk):
         self.log("Patching game data...")
         patched = patch_data_files(self.extractor.root, self.items)
         self.log(f"Patched {patched} strings.")
+        splash = install_splash(self.extractor.root)
+        self.log(f"Splash {splash['action']}.")
         cfg = self._make_config()
         cfg_key = f"{cfg.source_lang}|{cfg.target_lang}"
         save_local_cache(self.extractor.root, cfg_key, self.items)
@@ -1152,7 +1155,13 @@ class RPGMTranslatorApp(ctk.CTk):
             dst_data = tmp_root / src_data.relative_to(src_root)
             dst_data.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src_data, dst_data)
+            source_plugins = src_root / "www" / "js" / "plugins.js" if (src_root / "www").is_dir() else src_root / "js" / "plugins.js"
+            temp_plugins = tmp_root / source_plugins.relative_to(src_root)
+            temp_plugins.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_plugins, temp_plugins)
             patch_data_files(tmp_root, self.items)
+            splash = install_splash(tmp_root)
+            self.log(f"Splash {splash['action']} for export.")
             self.root_after(lambda: self._set_progress(0.7, self._t("progress_exporting")))
             export_dir = export_patch(tmp_root, dest, lang_code)
             msg = self._t("exported", export_dir)

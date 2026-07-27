@@ -407,4 +407,23 @@ def export_patch(
     if patch_dir.exists():
         shutil.rmtree(patch_dir)
     shutil.copytree(data_dir, patch_dir)
+    source_www_dir = root / "www" if (root / "www").is_dir() else root
+    patch_www_dir = patch_dir.parent
+    source_plugins_js = source_www_dir / "js" / "plugins.js"
+    source_splash_plugin = source_www_dir / "js" / "plugins" / "rpgm_translator_splash.js"
+    source_splash_image = source_www_dir / "img" / "pictures" / "splash.png_"
+    if not source_splash_image.is_file():
+        source_splash_image = source_splash_image.with_name("splash.png")
+    if source_plugins_js.is_file():
+        target_plugins_js = patch_www_dir / "js" / "plugins.js"
+        target_plugins_js.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_plugins_js, target_plugins_js)
+    if source_splash_plugin.is_file():
+        target_splash_plugin = patch_www_dir / "js" / "plugins" / source_splash_plugin.name
+        target_splash_plugin.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_splash_plugin, target_splash_plugin)
+    if source_splash_image.is_file():
+        target_splash_image = patch_www_dir / "img" / "pictures" / source_splash_image.name
+        target_splash_image.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_splash_image, target_splash_image)
     return patch_dir.parent.parent
