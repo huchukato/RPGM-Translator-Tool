@@ -10,11 +10,22 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Literal
 import json
+import logging
 import random
 import re
 import threading
 import time
 import requests
+
+
+logger = logging.getLogger(__name__)
+
+
+try:
+    import httpx
+    HTTPX_OK = True
+except ImportError:
+    HTTPX_OK = False
 
 
 def extract_character_names(game_root: Path) -> frozenset[str]:
@@ -450,32 +461,184 @@ class Translator:
         "en-US,en;q=0.9", "en-US,en;q=0.9,es;q=0.8",
         "en-GB,en;q=0.9", "en-CA,en-US;q=0.7,en;q=0.3",
     ]
-    _BING_CHAR_LIMIT = 900
+    _BING_CHAR_LIMIT = 950  # limite API Bing pubblica (UltraRenpyTranslator usa 950)
     _BING_SEP = "\n<<<SEP>>>\n"
 
-    def _bing_make_session(self, base_url: str = "https://www.bing.com", idx: int = 0) -> tuple:
-        import random
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": self._BING_USER_AGENTS[idx % len(self._BING_USER_AGENTS)],
-            "Accept-Language": self._BING_ACCEPT_LANGS[idx % len(self._BING_ACCEPT_LANGS)],
-        })
-        ig_val = ""; key_val = ""; token_val = ""
-        try:
-            home = session.get(f"{base_url}/translator", timeout=10)
-            html = home.text
-            m_ig = re.search(r'IG:"([0-9A-F]+)"', html)
-            m_abuse = re.search(
-                r'var params_AbusePreventionHelper\s*=\s*\[(\d+),"([^"]+)",(\d+)\]', html
-            )
-            if m_ig:
-                ig_val = m_ig.group(1)
-            if m_abuse:
-                key_val = m_abuse.group(1)
-                token_val = m_abuse.group(2)
-        except Exception:
-            pass
-        return session, ig_val, key_val, token_val
+    class _BingSession:
+        """Singola sessione Bing con token, cooldown e retry."""
+        _BASE_BACKOFF = 1.5
+
+        def __init__(self, base_url: str, idx: int = 0):
+            self.base_url = base_url
+            self.idx = idx
+            self.ig = ""
+            self.key = ""
+            self.token = ""
+            self.cooldown_until = 0.0
+            self.fail_count = 0
+            self.success_count = 0
+            self._use_httpx = HTTPX_OK
+            ua = Translator._BING_USER_AGENTS[idx % len(Translator._BING_USER_AGENTS)]
+            al = Translator._BING_ACCEPT_LANGS[idx % len(Translator._BING_ACCEPT_LANGS)]
+            headers = {
+                "User-Agent": ua,
+                "Accept-Language": al,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Encoding": "gzip, deflate",
+                "Connection": "keep-alive",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            }
+            if self._use_httpx:
+                limits = httpx.Limits(max_keepalive_connections=32, max_connections=32)
+                self._client = httpx.Client(
+                    base_url=base_url,
+                    limits=limits,
+                    timeout=httpx.Timeout(30.0, connect=10.0),
+                    headers=headers,
+                    cookies=httpx.Cookies(),
+                    follow_redirects=True,
+                )
+            else:
+                self._client = requests.Session()
+                from requests.adapters import HTTPAdapter
+                adapter = HTTPAdapter(pool_connections=32, pool_maxsize=32)
+                self._client.mount("https://", adapter)
+                self._client.headers.update(headers)
+            self._refresh_token()
+
+        def _refresh_token(self):
+            try:
+                if self._use_httpx:
+                    home = self._client.get("/translator", timeout=10.0)
+                else:
+                    home = self._client.get(f"{self.base_url}/translator", timeout=10)
+                html = home.text
+                m_ig = re.search(r'IG:"([0-9A-F]+)"', html)
+                m_abuse = re.search(
+                    r'var params_AbusePreventionHelper\s*=\s*\[(\d+),"([^"]+)",(\d+)\]', html
+                )
+                if m_ig:
+                    self.ig = m_ig.group(1)
+                if m_abuse:
+                    self.key = m_abuse.group(1)
+                    self.token = m_abuse.group(2)
+            except Exception:
+                pass
+
+        def is_available(self) -> bool:
+            return time.time() >= self.cooldown_until
+
+        def _set_cooldown(self, is_429: bool = False, is_timeout: bool = False, is_404: bool = False):
+            self.fail_count += 1
+            if is_404:
+                base = 1.5
+            elif is_429:
+                base = 2.0
+            elif is_timeout:
+                base = 1.0
+            else:
+                base = 0.5
+            self.cooldown_until = time.time() + base * (self._BASE_BACKOFF ** self.fail_count)
+
+        def _mark_success(self):
+            self.fail_count = 0
+            self.success_count += 1
+
+        def post(self, text: str, src: str, tgt: str, timeout_s: int = 30) -> str | None:
+            if src == "auto":
+                src = "en"
+            data = {
+                "fromLang": src,
+                "to": tgt,
+                "text": text,
+                "token": self.token,
+                "key": self.key,
+            }
+            _timeout_exc = (requests.exceptions.Timeout, httpx.TimeoutException) if HTTPX_OK else (requests.exceptions.Timeout,)
+            for attempt in range(3):
+                if not self.is_available():
+                    break
+                try:
+                    if self._use_httpx:
+                        r = self._client.post(
+                            "/ttranslatev3",
+                            params={"isVertical": "1", "IG": self.ig, "IID": "translator.5024"},
+                            data=data,
+                            timeout=timeout_s,
+                        )
+                    else:
+                        r = self._client.post(
+                            f"{self.base_url}/ttranslatev3",
+                            params={"isVertical": "1", "IG": self.ig, "IID": "translator.5024"},
+                            data=data,
+                            timeout=timeout_s,
+                        )
+                    if r.status_code == 429:
+                        logger.warning(f"Bing {self.base_url} 429 (len={len(data['text'])})")
+                        self._set_cooldown(is_429=True)
+                        if attempt < 2:
+                            time.sleep(0.5 * (self._BASE_BACKOFF ** attempt))
+                        continue
+                    if r.status_code == 404 or r.status_code >= 500:
+                        logger.warning(f"Bing {self.base_url} {r.status_code}: {r.text[:120]}")
+                        self._set_cooldown(is_404=(r.status_code == 404))
+                        if attempt < 2:
+                            time.sleep(0.3 * (self._BASE_BACKOFF ** attempt))
+                        continue
+                    r.raise_for_status()
+                    body = r.text
+                    if "Rate-limited" in body or "Server" in body:
+                        logger.warning(f"Bing {self.base_url} rate/server response: {body[:120]}")
+                        self._set_cooldown(is_429=True)
+                        if attempt < 2:
+                            time.sleep(0.5 * (self._BASE_BACKOFF ** attempt))
+                        continue
+                    result = r.json()[0]["translations"][0]["text"]
+                    self._mark_success()
+                    return result
+                except _timeout_exc:
+                    logger.warning(f"Bing {self.base_url} timeout (len={len(data['text'])})")
+                    self._set_cooldown(is_timeout=True)
+                    if attempt < 2:
+                        time.sleep(0.5 * (self._BASE_BACKOFF ** attempt))
+                except Exception as e:
+                    logger.warning(f"Bing {self.base_url} error: {type(e).__name__}: {e} | body: {getattr(r, 'text', '')[:120]}")
+                    self._set_cooldown()
+                    if attempt < 2:
+                        time.sleep(0.3 * (self._BASE_BACKOFF ** attempt))
+            return None
+
+    class _BingPool:
+        """Pool di sessioni Bing con rotazione e cooldown."""
+
+        def __init__(self, size: int = 6):
+            self.size = size
+            self._lock = threading.Lock()
+            endpoints = ["https://www.bing.com"] * size
+            self._sessions: list[Translator._BingSession] = [
+                Translator._BingSession(endpoints[i], i) for i in range(size)
+            ]
+            self._next = 0
+
+        def get_session(self) -> Translator._BingSession | None:
+            with self._lock:
+                for _ in range(self.size):
+                    sess = self._sessions[self._next % self.size]
+                    self._next += 1
+                    if sess.is_available():
+                        return sess
+                soonest = min(self._sessions, key=lambda s: s.cooldown_until)
+                return soonest
+
+        def refresh_all(self):
+            with self._lock:
+                for i, s in enumerate(self._sessions):
+                    if not s.is_available() or not s.token:
+                        self._sessions[i] = Translator._BingSession(s.base_url, i)
 
     def _bing_split_chunks(self, texts: list[str]) -> list[tuple[list[int], str]]:
         chunks = []
@@ -495,46 +658,35 @@ class Translator:
             chunks.append((cur_indices, self._BING_SEP.join(cur_parts)))
         return chunks
 
-    def _bing_post(self, session, text: str, src: str, tgt: str,
-                   ig: str, key: str, token: str,
-                   base_url: str = "https://www.bing.com") -> str:
-        r = session.post(
-            f"{base_url}/ttranslatev3",
-            params={"isVertical": "1", "IG": ig, "IID": "translator.5024"},
-            data={"fromLang": src, "to": tgt, "text": text, "token": token, "key": key},
-            timeout=self.cfg.timeout_s,
-        )
-        return r.json()[0]["translations"][0]["text"]
-
-    def _bing_translate_chunk(self, session, chunk_text: str, src: str, tgt: str,
-                              ig: str, key: str, token: str,
-                              base_url: str = "https://www.bing.com") -> list[str]:
+    def _bing_translate_chunk(self, pool: _BingPool, chunk_text: str, src: str, tgt: str) -> list[str]:
         n_expected = chunk_text.count(self._BING_SEP) + 1
-        raw = self._bing_post(session, chunk_text, src, tgt, ig, key, token, base_url)
-        parts = raw.split(self._BING_SEP)
-        if len(parts) == n_expected:
-            return parts
+        sess = pool.get_session()
+        if sess is None:
+            return chunk_text.split(self._BING_SEP)
+        raw = sess.post(chunk_text, src, tgt, timeout_s=self.cfg.timeout_s)
+        if raw is not None:
+            parts = raw.split(self._BING_SEP)
+            if len(parts) == n_expected:
+                return parts
         originals = chunk_text.split(self._BING_SEP)
         results = []
         for orig in originals:
-            try:
-                results.append(self._bing_post(session, orig, src, tgt, ig, key, token, base_url))
-            except Exception:
-                results.append(orig)
+            sess = pool.get_session()
+            tr = sess.post(orig, src, tgt, timeout_s=self.cfg.timeout_s) if sess else None
+            results.append(tr if tr is not None else orig)
         return results
 
     def _bing(self, texts: list[str], progress_cb=None, done_offset=0, total=0) -> list[str]:
         src, tgt = self.cfg.source_lang, self.cfg.target_lang
-        session, ig, key, token = self._bing_make_session()
+        pool = self._BingPool(size=1)
         results = list(texts)
         done = done_offset
         for indices, chunk_text in self._bing_split_chunks(texts):
-            try:
-                parts = self._bing_translate_chunk(session, chunk_text, src, tgt, ig, key, token)
+            parts = self._bing_translate_chunk(pool, chunk_text, src, tgt)
+            if parts:
                 for i, p in zip(indices, parts):
-                    results[i] = p.strip()
-            except Exception:
-                pass
+                    if p:
+                        results[i] = p.strip()
             done += len(indices)
             if progress_cb and total:
                 progress_cb(min(done, total), total)
@@ -544,29 +696,38 @@ class Translator:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         import threading
         src, tgt = self.cfg.source_lang, self.cfg.target_lang
-        n = 3
-        sessions = [self._bing_make_session(idx=i) for i in range(n)]
+        workers, _ = self._turbo_profile()
+        workers = max(3, min(workers * 4, 32))
+        pool = self._BingPool(size=workers)
         chunks = self._bing_split_chunks(texts)
         results = list(texts)
         done_count = [done_offset]
         lock = threading.Lock()
 
         def do_chunk(chunk_idx_data):
-            chunk_idx, (indices, chunk_text) = chunk_idx_data
-            sess, ig, key, token = sessions[chunk_idx % n]
-            try:
-                parts = self._bing_translate_chunk(sess, chunk_text, src, tgt, ig, key, token)
-                return indices, parts
-            except Exception:
-                return indices, None
+            _, (indices, chunk_text) = chunk_idx_data
+            parts = self._bing_translate_chunk(pool, chunk_text, src, tgt)
+            if len(parts) != len(indices):
+                originals = chunk_text.split(self._BING_SEP)
+                parts = []
+                for orig in originals:
+                    p = self._bing_translate_chunk(pool, orig, src, tgt)
+                    parts.append(p[0] if p else orig)
+            return indices, parts
 
-        with ThreadPoolExecutor(max_workers=n) as ex:
-            futures = [ex.submit(do_chunk, (i, c)) for i, c in enumerate(chunks)]
-            for f in as_completed(futures):
-                indices, parts = f.result()
-                if parts:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = {ex.submit(do_chunk, item): item for item in enumerate(chunks)}
+            for fut in as_completed(futures):
+                if self.cancelled:
+                    ex.shutdown(wait=False, cancel_futures=True)
+                    raise TranslationError("Traduzione annullata.")
+                try:
+                    indices, parts = fut.result()
                     for i, p in zip(indices, parts):
-                        results[i] = p.strip()
+                        if p:
+                            results[i] = p.strip()
+                except Exception:
+                    pass
                 with lock:
                     done_count[0] += len(indices)
                     if progress_cb and total:
@@ -574,44 +735,8 @@ class Translator:
         return results
 
     def _bing_ultra(self, texts: list[str], progress_cb=None, done_offset=0, total=0) -> list[str]:
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        import threading
-        src, tgt = self.cfg.source_lang, self.cfg.target_lang
-        workers, _ = self._turbo_profile()
-        bases = (["https://www.bing.com", "https://cn.bing.com"] * workers)[:workers]
-        sessions = [self._bing_make_session(base_url=b, idx=i) for i, b in enumerate(bases)]
-        chunks = self._bing_split_chunks(texts)
-        results = list(texts)
-        done_count = [done_offset]
-        lock = threading.Lock()
-
-        def do_chunk(chunk_idx_data):
-            chunk_idx, (indices, chunk_text) = chunk_idx_data
-            sess, ig, key, token = sessions[chunk_idx % len(sessions)]
-            base = bases[chunk_idx % len(bases)]
-            try:
-                parts = self._bing_translate_chunk(sess, chunk_text, src, tgt, ig, key, token, base)
-                return indices, parts
-            except Exception:
-                try:
-                    s, g, k, tk = sessions[0]
-                    parts = self._bing_translate_chunk(s, chunk_text, src, tgt, g, k, tk)
-                    return indices, parts
-                except Exception:
-                    return indices, None
-
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            futures = [ex.submit(do_chunk, (i, c)) for i, c in enumerate(chunks)]
-            for f in as_completed(futures):
-                indices, parts = f.result()
-                if parts:
-                    for i, p in zip(indices, parts):
-                        results[i] = p.strip()
-                with lock:
-                    done_count[0] += len(indices)
-                    if progress_cb and total:
-                        progress_cb(min(done_count[0], total), total)
-        return results
+        """Bing Ultra — alias di _bing_turbo per retrocompatibilita`."""
+        return self._bing_turbo(texts, progress_cb, done_offset, total)
 
     def _openrouter(self, texts: list[str]) -> list[str]:
         src = LANG_NAMES.get(self.cfg.source_lang, self.cfg.source_lang)
